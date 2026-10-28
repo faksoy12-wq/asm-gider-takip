@@ -12,6 +12,7 @@ const cats=['Elektrik','Su','Doğalgaz','Temizlik','Personel maaşı','Sarf malz
 const empty=()=>({doctors:[],expenses:[],transfers:[],allowances:[]});
 let db=load(), page='home', month=monthNow(), deferredInstall=null, busy=false, notification='';
 let monthManuallySelected=false;
+const authUI={mode:'login',email:'',message:null,completedSignup:false};
 let autoRefreshAt=0, autoRefreshPending=false;
 const cloud=window.ASMCloud;
 const state=()=>cloud.status();
@@ -359,13 +360,49 @@ function accountPage(){
     <div class="warning">Gerçek gider kayıtlarını bulut güvenlik yapılandırması tamamlanmadan burada saklamayın.</div>
     <div class="toolbar"><button class="secondary" data-go="home">Yerel moda dön</button></div></section>`+dataManagement();
   if(s.error&&!s.user)return `<div class="auth-layout"><section class="card"><h1>Bağlantı hatası</h1><p class="warning">${esc(s.error)}</p><button id="retry-cloud" class="wide">Yeniden dene</button></section></div>`;
-  if(!s.user)return `<div class="auth-layout"><section class="card"><div class="breadcrumb">GÜVENLİ GİRİŞ</div><h1>ASM hesabına giriş</h1>
-    <p class="muted">Hekimlerin aynı kayıtları görmesi için hesaplarına giriş yapması gerekir.</p>
-    <form id="login-form"><label>E-posta</label><input name="email" type="email" autocomplete="email" required>
-    <label>Şifre</label><input name="password" type="password" minlength="8" autocomplete="current-password" required>
-    <div class="toolbar"><button name="action" value="login" type="submit">Giriş yap</button><button class="secondary" name="action" value="signup" type="submit">Yeni hesap oluştur</button></div></form>
-    <p id="auth-feedback" class="auth-feedback" aria-live="polite" hidden></p>
-    <p class="form-note">Yeni hesap için e-posta doğrulaması gerekebilir. Şifrenizi yalnızca bu güvenli formda kullanın.</p></section></div>`;
+  if(!s.user)return `<div class="auth-layout"><section class="card auth-card">
+    <div class="auth-intro"><div class="auth-symbol" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="4" y="4" width="16" height="16" rx="5"/><path d="M12 8v8M8 12h8"/></svg></div>
+      <span class="breadcrumb">GÜVENLİ ASM ERİŞİMİ</span>
+      <h1>${authUI.mode==='login'?'Tekrar hoş geldiniz':'ASM Gider Takip’e katılın'}</h1>
+      <p class="muted">${authUI.mode==='login'?'Giderlerinizi ve ortak hesaplaşmaları görüntülemek için giriş yapın.':'Kişisel hesabınızı oluşturun. ASM yöneticisi sizi ortak çalışma alanına ekleyebilir.'}</p>
+    </div>
+    <div class="auth-mode-switch" role="group" aria-label="Hesap işlemi">
+      <button id="auth-mode-login" type="button" aria-pressed="${authUI.mode==='login'}" aria-controls="login-form" class="auth-mode-button ${authUI.mode==='login'?'is-active':''}">Giriş yap</button>
+      <button id="auth-mode-signup" type="button" aria-pressed="${authUI.mode==='signup'}" aria-controls="login-form" class="auth-mode-button ${authUI.mode==='signup'?'is-active':''}">Hesap oluştur</button>
+    </div>
+    ${authUI.completedSignup&&authUI.mode==='signup'?`<div class="auth-complete" role="status">
+      <div class="auth-complete-symbol" aria-hidden="true">✓</div>
+      <h2>Kayıt isteğiniz alındı</h2>
+      <p><strong>${esc(authUI.email)}</strong> adresinize bir doğrulama e-postası geldiyse bağlantıyı açın. Ardından giriş yapabilirsiniz.</p>
+      <p class="auth-complete-note">E-posta gelmediyse spam klasörüne bakın. Gönderim kotası nedeniyle e-posta henüz ulaşmamış olabilir; tekrar tekrar kayıt göndermek bunu çözmez.</p>
+      <button id="auth-complete-login" class="auth-submit" type="button">Giriş ekranına dön</button>
+    </div>`:`<form id="login-form" class="auth-form" autocomplete="on">
+      <label for="auth-email">E-posta adresi</label>
+      <input id="auth-email" name="email" type="email" inputmode="email" autocomplete="email" required maxlength="254" spellcheck="false" placeholder="adiniz@ornek.com" value="${esc(authUI.email)}">
+      <div class="auth-field-heading"><label for="auth-password">Şifre</label></div>
+      <div class="auth-password-field">
+        <input id="auth-password" name="password" type="password" minlength="8" maxlength="128" autocomplete="${authUI.mode==='signup'?'new-password':'current-password'}" required placeholder="En az 8 karakter">
+        <button class="auth-password-toggle" type="button" data-auth-show="auth-password" aria-label="Şifreyi göster" aria-pressed="false">Göster</button>
+      </div>
+      ${authUI.mode==='signup'?`<div class="auth-confirm-group">
+        <label for="auth-confirm">Şifre tekrar</label>
+        <div class="auth-password-field">
+          <input id="auth-confirm" name="confirmPassword" type="password" minlength="8" maxlength="128" autocomplete="new-password" required placeholder="Şifrenizi yeniden yazın">
+          <button class="auth-password-toggle" type="button" data-auth-show="auth-confirm" aria-label="Şifre tekrarını göster" aria-pressed="false">Göster</button>
+        </div>
+        <p class="auth-helper">En az 8 karakter kullanın. Şifrenizi kimseyle paylaşmayın.</p>
+      </div>`:''}
+      <button id="auth-submit" class="auth-submit" type="submit"><span class="auth-submit-spinner" aria-hidden="true"></span><span class="auth-submit-label">${authUI.mode==='signup'?'Hesabımı oluştur':'Giriş yap'}</span></button>
+    </form>`}
+    <p id="auth-feedback" class="auth-feedback ${authUI.message?(authUI.message.success?'success':'warning'):''}" aria-live="polite" role="${authUI.message?(authUI.message.success?'status':'alert'):'status'}" ${authUI.message?'':'hidden'}>${authUI.message?esc(authUI.message.text):''}</p>
+    <div class="auth-bottom">
+      ${authUI.mode==='login'?`<p>Henüz hesabınız yok mu? <button type="button" class="auth-link" id="auth-alt-signup">Hesap oluşturun</button></p>`:
+        `<p>Zaten hesabınız var mı? <button type="button" class="auth-link" id="auth-alt-login">Giriş yapın</button></p>`}
+      <p class="form-note">${authUI.mode==='signup'?'Hesap oluşturduktan sonra e-posta doğrulaması gerekebilir. Ortak ASM verileri için yöneticinizin size erişim vermesi gerekir.':'ASM’ye davet edildiyseniz, davet edilen e-posta adresinizle giriş yapın.'}</p>
+    </div>
+  </section></div>`;
   if(s.error&&!s.ready)return `<div class="auth-layout"><section class="card"><h1>ASM bağlantısı tamamlanamadı</h1><p class="warning">${esc(s.error)}</p><button id="retry-cloud" class="wide">Yeniden dene</button></section></div>`;
   if(!s.workspace)return `<div class="auth-layout"><section class="card"><div class="breadcrumb">HOŞ GELDİNİZ</div><h1>ASM çalışma alanı</h1>
     <p class="muted">${esc(s.user.email)} hesabına giriş yapıldı. Henüz bu hesabın erişebildiği bir ASM bulunmuyor.</p>
@@ -408,6 +445,9 @@ function render(){
   $('#nav').hidden=forced;
   $('#nav').style.display=forced?'none':'';
   $('#account').disabled=booting;
+  // The login screen already has a primary login action. Avoid a redundant
+  // header button while the user is unauthenticated.
+  $('#account').hidden=Boolean(s.enabled&&!s.user);
   $('#account').textContent=booting?'Hazırlanıyor':s.enabled?(s.ready?'Hesabım':'Giriş yap'):'Bulut / Hesap';
   const online=Boolean(s.enabled&&s.ready&&s.workspace);
   $('#cloud-status').innerHTML=`<span class="cloud-dot ${online&&!s.error?'cloud-dot--online':''}"></span>${booting?'Güvenli bağlantı hazırlanıyor':online?(s.error?'Ortak ASM · yenileme hatası':'Ortak ASM · güncel'):s.enabled?'Giriş gerekli':s.error?'Bağlantı hatası':'Yerel pilot'}`;
@@ -444,6 +484,13 @@ function render(){
   $('#device-doctor-form')?.addEventListener('submit',saveDeviceDoctor);
   $('#clear-device-doctor')?.addEventListener('click',clearDeviceDoctor);
   $('#login-form')?.addEventListener('submit',authSubmit);
+  $('#auth-mode-login')?.addEventListener('click',()=>switchAuthMode('login'));
+  $('#auth-mode-signup')?.addEventListener('click',()=>switchAuthMode('signup'));
+  $('#auth-alt-login')?.addEventListener('click',()=>switchAuthMode('login'));
+  $('#auth-alt-signup')?.addEventListener('click',()=>switchAuthMode('signup'));
+  $('#auth-complete-login')?.addEventListener('click',()=>switchAuthMode('login'));
+  root.querySelectorAll('[data-auth-show]').forEach(button=>button.addEventListener('click',()=>toggleAuthPassword(button)));
+  $('#auth-email')?.addEventListener('input',()=>{authUI.message=null;const feedback=$('#auth-feedback');if(feedback)feedback.hidden=true;});
   $('#new-workspace')?.addEventListener('submit',createWorkspace);
   $('#add-member')?.addEventListener('submit',addMember);
   $('#logout')?.addEventListener('click',signOut);
@@ -722,30 +769,78 @@ function authErrorMessage(error,action){
   if(code==='email_not_confirmed'||description.includes('email not confirmed'))return 'E-posta adresi henüz doğrulanmamış. Gelen kutunuzu ve spam klasörünü kontrol edin.';
   if(code==='invalid_credentials'||description.includes('invalid login credentials'))return 'E-posta adresi veya şifre hatalı. Bilgilerinizi kontrol edin.';
   if(code==='user_already_exists'||description.includes('user already registered'))return 'Bu adresle daha önce hesap oluşturulmuş olabilir. Lütfen giriş yapmayı deneyin.';
+  if(code==='weak_password'||description.includes('password should be'))return 'Bu şifre kabul edilmedi. Daha güçlü ve en az 8 karakterlik bir şifre oluşturun.';
+  if(code==='signup_disabled')return 'Yeni hesap oluşturma şu anda kapalı. ASM yöneticisiyle iletişime geçin.';
+  if(code==='email_address_invalid')return 'E-posta adresini kontrol edin. Geçerli bir adres girmeniz gerekiyor.';
   return (action==='signup'?'Hesap oluşturulamadı. ':'Giriş yapılamadı. ')+'Lütfen bilgilerinizi ve internet bağlantınızı kontrol edip yeniden deneyin.';
+}
+function switchAuthMode(next){
+  if(busy||!['login','signup'].includes(next)||next===authUI.mode)return;
+  authUI.email=$('#auth-email')?.value.trim()||authUI.email;
+  authUI.mode=next;
+  authUI.message=null;
+  authUI.completedSignup=false;
+  render();
+  $('#auth-email')?.focus();
+}
+function toggleAuthPassword(button){
+  const field=document.getElementById(button.dataset.authShow);
+  if(!field)return;
+  const showing=field.type==='password';
+  field.type=showing?'text':'password';
+  button.textContent=showing?'Gizle':'Göster';
+  button.setAttribute('aria-pressed',String(showing));
+  button.setAttribute('aria-label',showing?'Şifreyi gizle':'Şifreyi göster');
+  field.focus({preventScroll:true});
+}
+function authFeedback(text,success=false){
+  authUI.message={text,success};
+  const target=$('#auth-feedback');
+  if(!target)return;
+  target.textContent=text;
+  target.hidden=false;
+  target.className='auth-feedback '+(success?'success':'warning');
+  target.setAttribute('role',success?'status':'alert');
 }
 async function authSubmit(event){
   event.preventDefault();
   if(!ensureEditable())return;
-  const form=event.target,action=event.submitter?.value||'login';
-  const email=form.elements.email.value.trim(),password=form.elements.password.value;
-  const buttons=Array.from(form.querySelectorAll('button[type="submit"]'));
-  const feedback=form.parentElement?.querySelector('#auth-feedback');
-  function showFeedback(text,success=false){
-    if(!feedback){alert(text);return;}
-    feedback.textContent=text;
-    feedback.className='auth-feedback '+(success?'info':'warning');
-    feedback.setAttribute('role',success?'status':'alert');
-    feedback.hidden=false;
-  }
-  busy=true;
-  buttons.forEach(button=>button.disabled=true);
+  const form=event.currentTarget||event.target;
+  const action=authUI.mode;
+  const email=form.elements.email.value.trim().toLowerCase();
+  const password=form.elements.password.value;
+  authUI.email=email;
+  authUI.message=null;
+  const feedback=$('#auth-feedback');
   if(feedback){feedback.hidden=true;feedback.textContent='';}
+  if(action==='signup'&&password!==form.elements.confirmPassword.value){
+    authFeedback('Şifreler birbiriyle eşleşmiyor. İki alanı kontrol edin.');
+    form.elements.confirmPassword.focus();
+    return;
+  }
+  const submit=$('#auth-submit');
+  const label=submit?.querySelector('.auth-submit-label');
+  const selectors=['#auth-mode-login','#auth-mode-signup','#auth-alt-login','#auth-alt-signup'];
+  const otherButtons=selectors.map(s=>$(s)).filter(Boolean);
+  busy=true;
+  if(submit){
+    submit.disabled=true;
+    submit.classList.add('is-loading');
+  }
+  if(label)label.textContent=action==='signup'?'Hesap oluşturuluyor…':'Giriş yapılıyor…';
+  form.setAttribute('aria-busy','true');
+  for(const button of otherButtons)button.disabled=true;
   try{
     if(action==='signup'){
       const hasSession=await cloud.register(email,password);
       if(!hasSession){
-        showFeedback('Kayıt isteği alındı. E-posta adresinize doğrulama bağlantısı geldiyse açıp ardından giriş yapın.',true);
+        // Do not claim delivery: Supabase signUp can intentionally avoid
+        // revealing whether an address was already registered.
+        authUI.completedSignup=true;
+        authUI.message=null;
+        form.elements.password.value='';
+        form.elements.confirmPassword.value='';
+        render();
         return;
       }
     }else{
@@ -753,10 +848,16 @@ async function authSubmit(event){
     }
     render();
   }catch(error){
-    showFeedback(authErrorMessage(error,action));
+    authFeedback(authErrorMessage(error,action));
   }finally{
     busy=false;
-    buttons.forEach(button=>button.disabled=false);
+    if(submit){
+      submit.disabled=false;
+      submit.classList.remove('is-loading');
+    }
+    if(label)label.textContent=action==='signup'?'Hesabımı oluştur':'Giriş yap';
+    form.removeAttribute('aria-busy');
+    for(const button of otherButtons)button.disabled=false;
   }
 }
 async function createWorkspace(event){
@@ -785,7 +886,15 @@ async function migrateLocal(){
   await mutate(()=>{db=local});
 }
 async function signOut(){if(!ensureEditable())return;busy=true;
-  try {await cloud.logout();db=load();page='account';}
+  try {
+    await cloud.logout();
+    db=load();
+    page='account';
+    authUI.mode='login';
+    authUI.email='';
+    authUI.message=null;
+    authUI.completedSignup=false;
+  }
   catch(e){alert('Oturum kapatılamadı: '+e.message)}finally{busy=false;render()}
 }
 

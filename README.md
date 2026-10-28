@@ -119,3 +119,11 @@ Hekimler ekranı yalnızca hekim kayıtlarını gösterir. İsteğe bağlı JSON
 - Mevcut gideri düzenlerken eskiden kayıtlı ödeyen hekim aynen seçilir. Cihaz tercihi eski kayıtlara uygulanmaz.
 - Arşivlenen/hekim listesinden silinen bir kişi cihaz tercihi olarak otomatik uygulanmaz. Yeni hekim seçimi için Hesabım'a dönülür.
 - Bu ayar erişim yetkisi veya sunucuda hekim-kullanıcı doğrulaması sağlamaz; mevcut düzenleme izinleri değişmemiştir.
+
+## v16 — Giriş ve hesap oluşturma deneyimi
+
+- **Giriş yap** ve **Hesap oluştur** ayrı sekmelerde gösterilir; her sekmede yalnızca bir ana işlem butonu vardır. Giriş ekranı varsayılan olarak giriş modunda açılır.
+- E-posta ve şifre alanlarında açık, ilişkili etiketler; uygun otomatik doldurma; hesap oluştururken **şifre tekrar** doğrulaması ve şifreyi göster/gizle düğmeleri bulunur.
+- Gönderim sırasında işlem butonu ve diğer akışa geçiş devre dışı kalır, işlem metni ve dönen gösterge görünür. Supabase hata metinleri teknik ham mesaj yerine giriş formunun altında Türkçe ve erişilebilir olarak açıklanır.
+- E-posta kotası aşıldığında açık hata verilir. Başarılı hesap oluşturma isteğinde oturum açılmamışsa ayrı bir **kayıt isteği alındı** adımı gösterilir; doğrulama e-postasının mutlaka teslim edildiği iddia edilmez. Aynı kayıt isteğinin tekrar tekrar gönderilmesini önlemek için form bu adımda gizlenir ve kullanıcı tek düğmeyle girişe dönebilir.
+- Mevcut Supabase e-posta/şifre kimlik doğrulama, ASM davet ve üyelik yetkileri değişmez; Google ile giriş veya yeni e-posta gönderim altyapısı eklenmemiştir.
