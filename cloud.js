@@ -5,15 +5,16 @@
  * The SDK is only loaded if a Vercel project has Supabase URL + publishable key configured.
  */
 window.ASMCloud = (() => {
-  const state = {enabled:false,loading:true,resolving:false,ready:false,user:null,workspace:null,role:null,revision:0,members:[],error:null};
+  const state = {enabled:false,loading:true,resolving:false,syncing:false,lastSyncedAt:null,ready:false,user:null,workspace:null,role:null,revision:0,members:[],error:null};
   let client=null, listener=()=>{}, pendingWorkspaceLoad=null;
   function setUser(user){
     if(state.user?.id!==user?.id){
       state.workspace=null;state.role=null;state.ready=false;state.members=[];state.revision=0;
+      state.lastSyncedAt=null;state.syncing=false;state.error=null;
     }
     state.user=user;
   }
-  const changed=()=>listener();
+  const changed=data=>listener(data);
   const message = error => error?.message || 'Bilinmeyen bir hata oluştu';
   const empty = () => ({doctors:[],expenses:[],transfers:[],allowances:[]});
 
@@ -66,7 +67,10 @@ window.ASMCloud = (() => {
     // Avoid two overlapping requests when Supabase emits SIGNED_IN during login.
     if(pendingWorkspaceLoad)return pendingWorkspaceLoad;
     const userId=state.user.id;
+    const previouslyReady=state.ready;
+    const previousWorkspace=state.workspace?.id;
     if(!state.ready){state.resolving=true;changed();}
+    else state.syncing=true;
     const request=(async()=>{
       let loadedData=null;
       try {
@@ -85,12 +89,15 @@ window.ASMCloud = (() => {
           .select('content,revision').eq('workspace_id',workspace.id).single();
         if(loadErr)throw loadErr;
         if(state.user?.id!==userId)return null;
-        loadedData=ledger.content||empty();
+        const latestData=ledger.content||empty();
+        const changedRevision=!previouslyReady||previousWorkspace!==workspace.id||state.revision!==ledger.revision;
+        loadedData=changedRevision?latestData:null;
         state.workspace=workspace;
         state.role=membership.role;
         state.revision=ledger.revision;
         state.ready=true;
         state.error=null;
+        state.lastSyncedAt=Date.now();
         localStorage.setItem('asm-workspace-preferred',workspace.id);
         return loadedData;
       }catch(error){
@@ -99,7 +106,9 @@ window.ASMCloud = (() => {
       }finally{
         if(state.user?.id===userId){
           state.resolving=false;
-          changed(loadedData);
+          state.syncing=false;
+          // A no-change background check must not repaint the interface.
+          if(loadedData!==null||!previouslyReady||state.error||!state.workspace)changed(loadedData);
         }
       }
     })();
@@ -132,13 +141,15 @@ window.ASMCloud = (() => {
     if(error)throw error;
     await loadWorkspace();
   }
-  async function saveLedger(data){
+  async function saveLedger(data,expectedRevision=state.revision){
     if(!client||!state.ready||!state.workspace)throw new Error('ASM bulut bağlantısı aktif değil');
     const {data:rev,error}=await client.rpc('asm_save_ledger',{
-      p_workspace:state.workspace.id,p_expected_revision:state.revision,p_content:data
+      p_workspace:state.workspace.id,p_expected_revision:expectedRevision,p_content:data
     });
     if(error)throw error;
     state.revision=rev;
+    state.error=null;
+    state.lastSyncedAt=Date.now();
     changed();
   }
   async function listMembers(){

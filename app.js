@@ -9,6 +9,7 @@ const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;
 const cats=['Elektrik','Su','Doğalgaz','Temizlik','Personel maaşı','Sarf malzemesi','Kira','İnternet / Telefon','Bakım / Onarım','Diğer'];
 const empty=()=>({doctors:[],expenses:[],transfers:[],allowances:[]});
 let db=load(), page='home', month=monthNow(), deferredInstall=null, busy=false, notification='';
+let autoRefreshAt=0, autoRefreshPending=false;
 const cloud=window.ASMCloud;
 const state=()=>cloud.status();
 const poolStatus=()=>window.ASMAllowanceMath.analyze(db,month);
@@ -23,10 +24,11 @@ function ensureEditable(){if(busy){alert('Önce devam eden kayıt işleminin bit
 async function mutate(fn,callback){
   if(!ensureEditable())return;
   const previous=JSON.parse(JSON.stringify(db));
+  const expectedRevision=state().revision;
   busy=true;
   try {
     fn();validateBackup(db);
-    if(hasRemote())await cloud.saveLedger(db);
+    if(hasRemote())await cloud.saveLedger(db,expectedRevision);
     else localStorage.setItem(KEY,JSON.stringify(db));
     if(callback)callback();else render();
   }catch(error){
@@ -302,7 +304,7 @@ function render(){
   $('#account').disabled=booting;
   $('#account').textContent=booting?'Hazırlanıyor':s.enabled?(s.ready?'Hesabım':'Giriş yap'):'Bulut / Hesap';
   const online=Boolean(s.enabled&&s.ready&&s.workspace);
-  $('#cloud-status').innerHTML=`<span class="cloud-dot ${online?'cloud-dot--online':''}"></span>${booting?'Güvenli bağlantı hazırlanıyor':online?'Ortak ASM · senkronize':s.enabled?'Giriş gerekli':s.error?'Bağlantı hatası':'Yerel pilot'}`;
+  $('#cloud-status').innerHTML=`<span class="cloud-dot ${online&&!s.error?'cloud-dot--online':''}"></span>${booting?'Güvenli bağlantı hazırlanıyor':online?(s.error?'Ortak ASM · yenileme hatası':'Ortak ASM · güncel'):s.enabled?'Giriş gerekli':s.error?'Bağlantı hatası':'Yerel pilot'}`;
   $('#footer-note').textContent=booting?'Güvenli bağlantı hazırlanıyor…':online?'Veriler ortak ASM veritabanında saklanır. Raporlar için düzenli yedek önerilir.':'Bu sürümde veriler yalnızca bu cihazda saklanır. Düzenli yedek alın.';
   if(booting){$('#app').innerHTML=launchScreen();return;}
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.page===view));
@@ -332,7 +334,30 @@ function render(){
   $('#refresh-workspace')?.addEventListener('click',refreshCloud);
   $('#migrate-local')?.addEventListener('click',migrateLocal);
 }
-function navigate(next){page=next;render();if(next==='account'&&state().role==='owner')cloud.listMembers().catch(e=>{notification=e.message;render()})}
+function editingFormOpen(){
+  return Boolean(document.querySelector('#expense-form, #allowance-form'));
+}
+async function autoRefreshCloud(){
+  // Startup restoration fetches the current ledger. Re-check on navigation
+  // and foreground return, but do not interrupt active editing forms.
+  if(!hasRemote()||busy||autoRefreshPending||editingFormOpen())return;
+  if(Date.now()-autoRefreshAt<5000)return;
+  autoRefreshAt=Date.now();
+  autoRefreshPending=true;
+  try{
+    await cloud.refresh();
+  }catch(error){
+    notification='Ortak kayıtlar güncellenemedi. İnternet bağlantınızı kontrol edip tekrar deneyin.';
+    if(!editingFormOpen()&&!busy)render();
+  }finally{
+    autoRefreshPending=false;
+  }
+}
+function navigate(next){
+  page=next;render();
+  if(next==='account'&&state().role==='owner')cloud.listMembers().catch(e=>{notification=e.message;render()});
+  void autoRefreshCloud();
+}
 function expenseForm(id){
   if(!db.doctors.length){alert('Önce en az bir hekim ekleyin.');navigate('doctors');return}
   const e=db.expenses.find(x=>x.id===id),participants=e?.participants||db.doctors.map(d=>d.id);
@@ -577,7 +602,30 @@ async function signOut(){if(!ensureEditable())return;busy=true;
 $('#account').onclick=()=>navigate('account');
 document.querySelectorAll('nav button').forEach(button=>button.onclick=()=>navigate(button.dataset.page));
 window.addEventListener('beforeinstallprompt',event=>{event.preventDefault();deferredInstall=event;$('#install').hidden=false});
+window.addEventListener('pageshow',()=>{void autoRefreshCloud()});
+window.addEventListener('focus',()=>{void autoRefreshCloud()});
+window.addEventListener('online',()=>{void autoRefreshCloud()});
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible')void autoRefreshCloud();
+});
 $('#install').onclick=async()=>{if(deferredInstall){deferredInstall.prompt();await deferredInstall.userChoice;deferredInstall=null;$('#install').hidden=true}};
 if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js').catch(()=>{});
-cloud.init(remote=>{if(remote){try {validateBackup(remote);db=remote;}catch(e){notification='Buluttaki kayıtlar doğrulanamadı: '+e.message}}render()});
+cloud.init(remote=>{
+  if(remote){
+    try{
+      validateBackup(remote);
+      if(!busy){
+        if(editingFormOpen()){
+          notification='Ortak kayıtlar başka bir cihazda değişti. Güncel haliyle devam etmek için açık form kapatıldı.';
+        }
+        db=remote;
+      }else{
+        // Never overwrite an in-flight local edit with a simultaneous fetch.
+        notification='Ortak kayıtlar yenilendi. Kaydetme işleminin ardından güncel verileri yeniden kontrol edin.';
+        return;
+      }
+    }catch(e){notification='Buluttaki kayıtlar doğrulanamadı: '+e.message;}
+  }
+  if(!editingFormOpen()||remote||state().loading||state().resolving)render();
+});
 render();

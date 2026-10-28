@@ -85,3 +85,12 @@ Hekimler ekranı yalnızca hekim kayıtlarını gösterir. İsteğe bağlı JSON
 - Bölünemeyen kuruşlar hekimlerin kayıt sırasına göre 1 kuruşluk parçalar halinde dağıtılır. Negatif kalan da doğru hesaplanır.
 - PDF raporunda ödenek havuzu ve net hekim bakiyeleri (girişler tamamsa) yer alır.
 - **Erişim notu:** Halihazırda ortak ASM defterine erişen tüm yetkili editörler diğer hekimlerin ödeneklerini de değiştirebilir. Hekimlerin yalnızca kendi ödeneğine müdahale edebilmesi için hekim-kullanıcı eşleştirmesi ve sunucu tarafında yetki politikası eklenmelidir.
+
+## v12 — Otomatik ortak kayıt yenilemesi
+
+- Oturum açıkken sayfa ilk yüklendiğinde buluttaki ASM defteri otomatik alınır.
+- Açık uygulama yeniden öne getirildiğinde (telefon uygulamasına dönüş, sekme odağı veya geri/ileri geçmişi), internet bağlantısı geri geldiğinde ve ana sekmeler arasında gezinildiğinde ek veri kontrolü yapılır.
+- Yakın aralıklı olaylar beş saniyelik aralıkla sınırlandırılır. Kayıtların değişmediği durumda gereksiz veri yeniden çizilmez.
+- Gider veya ödenek düzenleme formu açıksa otomatik istek başlatılmaz; kullanıcı girdilerinin kaybolması önlenir. Beklenmeyen eş zamanlı değişiklik durumunda eski formu açık bırakarak üzerine yazmak yerine güncel kayıt gösterilir.
+- Ortak defter PostgreSQL revizyon kontrolüyle korunur. Kaydetme başlamadan önceki revizyon ile yazma yapılır; başka cihazın değişikliğinin üzerine sessizce yazılmaz.
+- Bu özellik **anlık gerçek zamanlı dinleme** değildir: giriş, sayfa/uygulama dönüşü ve sekme geçişinde yenilenir. Ayrı cihazlardaki kayıtlar güncel görünsün diye aynı hesabın şifresini paylaşmak güvenlik açısından önerilmez.
