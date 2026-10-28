@@ -7,8 +7,26 @@
  * recorded values independent from future corrections to earlier months.
  */
 window.ASMAllowanceMath = (() => {
+  const isArchived = (doctor, selectedMonth) =>
+    (doctor.inactivePeriods || []).some(period => period.from <= selectedMonth && (period.to === null || selectedMonth < period.to));
+
+  function hasMonthHistory(ledger, doctorId, selectedMonth) {
+    // Keep doctors with actual records included in their historical accounting,
+    // even if they were archived later in that same month.
+    return (ledger.allowances || []).some(a => a.doctorId === doctorId && a.month === selectedMonth)
+      || (ledger.expenses || []).some(e => e.date.slice(0, 7) === selectedMonth
+        && (e.paidBy === doctorId || e.participants.includes(doctorId)))
+      || (ledger.transfers || []).some(t => t.month === selectedMonth
+        && (t.from === doctorId || t.to === doctorId));
+  }
+
+  function doctorsForMonth(ledger, selectedMonth) {
+    return (ledger.doctors || []).filter(d =>
+      !isArchived(d, selectedMonth) || hasMonthHistory(ledger, d.id, selectedMonth));
+  }
+
   function effectiveAllowances(ledger, selectedMonth) {
-    const doctors = ledger.doctors || [];
+    const doctors = doctorsForMonth(ledger, selectedMonth);
     const validIds = new Set(doctors.map(d => d.id));
     const current = new Map();
     const past = new Map();
@@ -45,7 +63,7 @@ window.ASMAllowanceMath = (() => {
   }
 
   function analyze(ledger, selectedMonth) {
-    const doctors = ledger.doctors || [];
+    const doctors = doctorsForMonth(ledger, selectedMonth);
     const effective = effectiveAllowances(ledger, selectedMonth);
     const received = new Map(effective.map(d => [d.id, d]));
     const recordedCount = effective.filter(d => d.allowance !== null).length;
@@ -81,5 +99,5 @@ window.ASMAllowanceMath = (() => {
       inheritedCount, doctorCount: doctors.length, totalAllowance,
       totalExpenses, remainder, baseShare: base, perDoctor};
   }
-  return {analyze, effectiveAllowances, snapshotInherited};
+  return {analyze, effectiveAllowances, snapshotInherited, doctorsForMonth, isArchived};
 })();

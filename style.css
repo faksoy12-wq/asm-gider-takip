@@ -418,3 +418,26 @@ input:focus, select:focus, textarea:focus { border-color: #29968b; }
   .month-switcher {width:100%; justify-content:flex-start;}
   .month-switcher .select-month {width:auto; flex:1 1 160px;}
 }
+
+/* v14: safe physician archival. Keep destructive deletion visually distinct. */
+.doctor-roster-row {
+  display:grid;
+  grid-template-columns:minmax(0,1fr) max-content;
+  gap:12px;align-items:center;
+}
+.doctor-roster-row .item-main {min-width:0;overflow-wrap:anywhere;}
+.doctor-roster-row button {font-size:12px;padding:9px 12px;min-width:85px;}
+.archived-roster {padding:0;overflow:hidden;}
+.archived-roster details summary {
+  display:block;cursor:pointer;padding:17px 19px;
+  color:#264a53;font-weight:700;font-size:14px;
+  list-style:disclosure-closed;
+}
+.archived-roster details[open] summary {border-bottom:1px solid #e4ecee;}
+.archived-roster details>p,
+.archived-roster details>.doctor-roster-row {margin-left:19px;margin-right:19px;}
+.archived-roster details>.doctor-roster-row:last-child {margin-bottom:15px;}
+@media(max-width:530px) {
+  .doctor-roster-row {grid-template-columns:minmax(0,1fr) max-content;gap:8px;}
+  .doctor-roster-row button {min-width:72px;padding:8px 9px;}
+}

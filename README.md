@@ -103,3 +103,11 @@ Hekimler ekranı yalnızca hekim kayıtlarını gösterir. İsteğe bağlı JSON
 - Otomatik tutarlar Hekimler ekranında ve PDF'de açıkça işaretlenir: Bunlar yeni aya ait banka hareketleri doğrulanmadan **varsayım** niteliğindedir.
 - Yeni ay için ilk ödenek/gider/transfer kaydı yapılırken otomatik tutarlar o ayın defterine kopyalanır (copiedFrom alanıyla), böylece geçmiş aylara sonradan yapılan tutar düzeltmeleri daha önce işlem yapılmış yeni ayları sessizce değiştirmez.
 - Eski aylardaki kayıtlar ve hesaplaşmalar korunur. Kullanıcının elle seçtiği eski ay, isteği dışında güncel aya çevrilmez; **Bu ay** düğmesiyle güncel aya dönülebilir.
+
+## v14 — Hekim silme ve güvenli arşivleme
+
+- **Hekimler → Aktif hekimler** altında henüz hiç gider, ödenek veya transfer kaydı bulunmayan hekim, onaydan sonra kalıcı olarak silinebilir.
+- İlişkili finansal kaydı bulunan hekim **Arşivle** düğmesiyle mevcut aydan itibaren pasifleştirilir; JSON defterindeki kimliği ve eski gider/ödenek/transfer kayıtları korunur. **Arşivdeki hekimler** panelinden yeniden aktifleştirilebilir.
+- Arşivlenmiş hekim, gelecek ayların gider girişlerinde ve ödeneklerin otomatik aktarımında yer almaz. Arşivleme ayına veya önceki dönemlere ait gerçek finansal kaydı varsa, geçmiş hesapların bölüşümü değişmemesi için o ilgili ayın hesaplaşmasında yer almaya devam eder.
+- Pasiflik tarihleri, her hekim için isteğe bağlı `inactivePeriods:[{from:"YYYY-MM",to:null|"YYYY-MM"}]` aralıklarında tutulur. Geri alınan bir hekim önceki boş dönemlere geriye dönük dahil edilmez. Eski JSON yedekleri aynı şekilde kullanılabilir.
+- Yedek doğrulaması arşiv tarih sırasını kontrol eder; mevcut ortak Supabase veritabanı şemasının değiştirilmesi gerekmez.

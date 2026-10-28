@@ -16,6 +16,12 @@ let autoRefreshAt=0, autoRefreshPending=false;
 const cloud=window.ASMCloud;
 const state=()=>cloud.status();
 const poolStatus=()=>window.ASMAllowanceMath.analyze(db,month);
+const periodDoctors=(selected=month)=>window.ASMAllowanceMath.doctorsForMonth(db,selected);
+const isArchivedNow=doctorRecord=>window.ASMAllowanceMath.isArchived(doctorRecord,monthNow());
+const isArchivedInMonth=(doctorRecord,selected)=>window.ASMAllowanceMath.isArchived(doctorRecord,selected);
+const doctorHasHistory=id=>db.expenses.some(e=>e.paidBy===id||e.participants.includes(id))
+  ||db.transfers.some(t=>t.from===id||t.to===id)
+  ||(db.allowances||[]).some(a=>a.doctorId===id);
 const dateForNewExpense=()=>month===monthNow()?today():month+'-01';
 function snapshotAllowancesForMonth(entryMonth){
   db.allowances ||= [];
@@ -75,7 +81,7 @@ function split(expense){
 function balances(){
   const pool=poolStatus();
   if(pool.active&&pool.complete)return Object.fromEntries(pool.perDoctor.map(d=>[d.id,d.balance]));
-  const out=Object.fromEntries(db.doctors.map(d=>[d.id,0]));
+  const out=Object.fromEntries(periodDoctors().map(d=>[d.id,0]));
   for(const expense of selectedMonth()){
     out[expense.paidBy]=(out[expense.paidBy]||0)+expense.amount;
     for(const [id,share] of Object.entries(split(expense)))out[id]=(out[id]||0)-share;
@@ -118,7 +124,7 @@ function home(){
   return heading('Genel Bakış','Aylık giderler ve güncel bakiyeler',true)+`
     <section class="grid" aria-label="Özet göstergeleri">
       <div class="card"><span class="muted">${pool.active?'Toplam ödenek':'Toplam gider'}</span><div class="metric">${money(pool.active?pool.totalAllowance:sum)}</div><span class="fine">${pool.active?pool.recordedCount+' / '+pool.doctorCount+' ödenek girildi':selected.length+' harcama'}</span></div>
-      <div class="card"><span class="muted">${pool.active?'Toplam gider':'Hekim başına ortalama'}</span><div class="metric">${money(pool.active?pool.totalExpenses:(db.doctors.length?Math.round(sum/db.doctors.length):0))}</div><span class="fine">${pool.active?selected.length+' harcama':db.doctors.length+' hekim · yalnızca ortalama'}</span></div>
+      <div class="card"><span class="muted">${pool.active?'Toplam gider':'Hekim başına ortalama'}</span><div class="metric">${money(pool.active?pool.totalExpenses:(periodDoctors().length?Math.round(sum/periodDoctors().length):0))}</div><span class="fine">${pool.active?selected.length+' harcama':periodDoctors().length+' hekim · yalnızca ortalama'}</span></div>
     </section>
     ${pool.active?`<section class="card"><span class="muted">Toplam kalan</span>
       ${pool.complete?`<div class="metric teal">${money(pool.remainder)}</div><p class="fine">Hekim başına yaklaşık ${money(pool.baseShare)}. Kuruş farkları tam olarak dağıtılır.</p>`:`<p class="warning">Ödenek kaydı bekleyenler: ${pool.missing.map(d=>esc(d.name)).join(', ')}</p>`}
@@ -145,11 +151,11 @@ function allowanceSection(){
       <span class="tag">${pool.recordedCount} / ${pool.doctorCount} tutar</span></div>
     <p class="muted">Bir hekimin ödeneğini bir kez kaydetmeniz yeterli. Yeni aylarda önceki ayın tutarı otomatik önerilir; sadece değişiklik varsa güncelleyin. 0 TL de geçerli bir tutardır.</p>
     ${pool.inheritedCount?`<p class="info">${pool.inheritedCount} hekimin ödeneği önceki aydan otomatik getirildi. Bunlar varsayılan tutarlardır; gerçek ödenek farklı yatarsa ilgili hekimi güncelleyin.</p>`:''}
-    ${db.doctors.map(d=>{
+    ${periodDoctors().map(d=>{
       const item=pool.perDoctor.find(p=>p.id===d.id);
       const filled=item?.allowance!==null&&item?.allowance!==undefined;
       return `<div class="allowance-row"><div class="allowance-row__person">
-        <strong>${esc(d.name)}</strong>
+        <strong>${esc(d.name)}${isArchivedNow(d)?' · Arşivde':''}</strong>
         <small>${item?.inherited?'Önceki aydan otomatik · '+esc(item.sourceMonth):filled?'Bu ay güncellendi':'Ödenek bekleniyor'}</small></div>
         <div class="allowance-row__amount"><strong class="${filled?'teal':'muted'}">${filled?money(item.allowance):'—'}</strong>
         <button type="button" class="secondary" data-allowance="${esc(d.id)}">${filled?'Güncelle':'Ödenek gir'}</button></div></div>`;
@@ -197,13 +203,23 @@ async function removeAllowance(id,recordMonth){
 }
 
 function doctorsPage(){
+  const active=db.doctors.filter(d=>!isArchivedNow(d));
+  const archived=db.doctors.filter(isArchivedNow);
   return heading('Hekimler','Hekimler ve aylık ödenekler',true)+`
     ${allowanceSection()}
     <section class="card"><h2>Yeni hekim</h2><form id="add-doctor"><label for="doctor-name">Ad soyad</label>
     <input id="doctor-name" name="name" maxlength="100" placeholder="Örn. Dr. Ahmet Yılmaz" autocomplete="off" required>
     <div class="toolbar"><button type="submit">+ Hekim ekle</button></div></form></section>
-    <section class="card"><h2>Kayıtlı hekimler (${db.doctors.length})</h2>
-    ${db.doctors.map(d=>`<div class="item money-row"><strong class="item-main">${esc(d.name)}</strong><button class="danger" data-del-doctor="${esc(d.id)}">Sil</button></div>`).join('')||'<div class="empty">Önce hekim ekleyin.</div>'}</section>
+    <section class="card"><h2>Aktif hekimler (${active.length})</h2>
+    ${active.map(d=>`<div class="item doctor-roster-row"><strong class="item-main">${esc(d.name)}</strong>
+      <button type="button" class="${doctorHasHistory(d.id)?'secondary':'danger'}" data-del-doctor="${esc(d.id)}">${doctorHasHistory(d.id)?'Arşivle':'Sil'}</button></div>`).join('')||'<div class="empty">Aktif hekim bulunmuyor.</div>'}
+    <p class="fine">Gideri, ödeneği veya transferi bulunan hekimler silinmek yerine arşivlenir. Geçmiş dönem hesapları korunur.</p>
+    </section>
+    ${archived.length?`<section class="card archived-roster"><details><summary>Arşivdeki hekimler (${archived.length})</summary>
+      <p class="fine">Geçmiş gider ve hesaplaşmalar korunur. Gerekirse hekimi yeniden aktifleştirebilirsiniz.</p>
+      ${archived.map(d=>`<div class="item doctor-roster-row"><strong class="item-main">${esc(d.name)}</strong>
+        <button type="button" class="secondary" data-restore-doctor="${esc(d.id)}">Aktifleştir</button></div>`).join('')}
+    </details></section>`:''}
 `;
 }
 function dataManagement(){
@@ -231,7 +247,7 @@ function settlement(){
   return heading('Ay Sonu Hesaplaşma','Yapılan ödemeler düşülmüş kalan bakiyeler',true)+`
     <section class="card"><span class="muted">Toplam aylık gider</span><div class="receipt-value teal">${money(sum)}</div>
     <hr class="divider"><h2>Hekim bakiyeleri</h2>
-    ${db.doctors.map(d=>balanceRow(d.name,b[d.id]||0)).join('')||'<div class="empty">Hekim ekleyin.</div>'}
+    ${periodDoctors().map(d=>balanceRow(d.name,b[d.id]||0)).join('')||'<div class="empty">Bu ay aktif hekim yok.</div>'}
     <p class="fine">Pozitif bakiye alacak; negatif bakiye borç anlamına gelir.</p></section>
     <section class="card"><h2>Önerilen transferler</h2>
     ${pending.map((t,i)=>`<div class="item transfer-row"><div class="money-row"><div class="item-main"><strong>${esc(doctor(t.from))} → ${esc(doctor(t.to))}</strong><small>Gönderilecek tutar</small></div><strong class="amount teal">${money(t.amount)}</strong></div><div class="toolbar"><button data-transfer="${i}">Ödendi olarak kaydet</button></div></div>`).join('')||'<div class="success">Bu ay için bekleyen transfer yok.</div>'}
@@ -357,6 +373,7 @@ function render(){
   root.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>expenseForm(b.dataset.edit));
   root.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>deleteExpense(b.dataset.del));
   root.querySelectorAll('[data-del-doctor]').forEach(b=>b.onclick=()=>deleteDoctor(b.dataset.delDoctor));
+  root.querySelectorAll('[data-restore-doctor]').forEach(b=>b.onclick=()=>restoreDoctor(b.dataset.restoreDoctor));
   root.querySelectorAll('[data-transfer]').forEach(b=>b.onclick=()=>recordTransfer(Number(b.dataset.transfer)));
   root.querySelectorAll('[data-undo]').forEach(b=>b.onclick=()=>undoTransfer(b.dataset.undo));
   root.querySelectorAll('[data-remove-member]').forEach(b=>b.onclick=()=>removeMember(b.dataset.removeMember));
@@ -402,8 +419,13 @@ function navigate(next){
 }
 function expenseForm(id){
   syncMonthWithCalendar(true);
-  if(!db.doctors.length){alert('Önce en az bir hekim ekleyin.');navigate('doctors');return}
-  const e=db.expenses.find(x=>x.id===id),participants=e?.participants||db.doctors.map(d=>d.id);
+  const e=db.expenses.find(x=>x.id===id);
+  // Archived doctors remain selectable only for editing their existing history.
+  const formMonth=e?.date.slice(0,7)||month;
+  const formDoctors=db.doctors.filter(d=>!isArchivedInMonth(d,formMonth)
+    ||(e&&(e.paidBy===d.id||e.participants.includes(d.id))));
+  if(!formDoctors.length){alert('Bu ay aktif hekim bulunmuyor. Önce Hekimler bölümünden bir hekim ekleyin veya arşivden geri alın.');navigate('doctors');return}
+  const participants=e?.participants||formDoctors.map(d=>d.id);
   page='expenses';document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.page==='expenses'));
   $('#app').innerHTML=heading(e?'Gideri düzenle':'Yeni gider ekle',e?'Mevcut harcamayı güncelleyin':'Ödemeyi yapanı ve paylaşan hekimleri belirleyin')+`
     <form id="expense-form">
@@ -411,11 +433,11 @@ function expenseForm(id){
       <div class="field"><label>Tutar (₺) *</label><input name="amount" inputmode="decimal" type="text" required value="${e?(e.amount/100).toFixed(2).replace('.',','):''}" placeholder="8.400,00"></div>
       <div class="field"><label>Harcama tarihi *</label><input type="date" name="date" required value="${e?.date||dateForNewExpense()}"></div></div>
       <label>Açıklama</label><textarea name="description" rows="2" maxlength="500" placeholder="Örn. Ekim ayı elektrik faturası">${esc(e?.description||'')}</textarea></section>
-      <section class="card"><h2>02 — Ödeme bilgileri</h2><div class="form-grid"><div class="field"><label>Ödemeyi yapan hekim *</label><select name="paidBy">${db.doctors.map(d=>`<option value="${esc(d.id)}" ${e?.paidBy===d.id?'selected':''}>${esc(d.name)}</option>`).join('')}</select></div>
+      <section class="card"><h2>02 — Ödeme bilgileri</h2><div class="form-grid"><div class="field"><label>Ödemeyi yapan hekim *</label><select name="paidBy">${formDoctors.map(d=>`<option value="${esc(d.id)}" ${e?.paidBy===d.id?'selected':''}>${esc(d.name)}</option>`).join('')}</select></div>
       <div class="field"><label>Ödeme yöntemi</label><select name="paymentMethod">${[['bank','Banka havalesi / EFT'],['cash','Nakit'],['card','Kart']].map(([v,n])=>`<option value="${v}" ${e?.paymentMethod===v?'selected':''}>${n}</option>`).join('')}</select></div></div></section>
       <section class="card"><h2>03 — Gider paylaşımı</h2><label>Paylaştırma yöntemi</label><select name="method" id="method"><option value="equal" ${e?.method!=='custom'?'selected':''}>Eşit paylaştır</option><option value="custom" ${e?.method==='custom'?'selected':''}>Yüzdelere göre</option></select>
       <p class="hint">Bu giderden sorumlu hekimleri seçin. Hekim isminin yanındaki alan özel paylaşım yüzdesidir.</p>
-      ${db.doctors.map(d=>`<div class="checkrow"><input type="checkbox" id="p-${esc(d.id)}" data-participant="${esc(d.id)}" ${participants.includes(d.id)?'checked':''}><label for="p-${esc(d.id)}">${esc(d.name)}</label><input class="share-input" data-percent="${esc(d.id)}" inputmode="decimal" aria-label="${esc(d.name)} yüzdesi" value="${e?.percentages?.[d.id]??(100/db.doctors.length).toFixed(2)}" placeholder="%"></div>`).join('')}
+      ${formDoctors.map(d=>`<div class="checkrow"><input type="checkbox" id="p-${esc(d.id)}" data-participant="${esc(d.id)}" ${participants.includes(d.id)?'checked':''}><label for="p-${esc(d.id)}">${esc(d.name)}</label><input class="share-input" data-percent="${esc(d.id)}" inputmode="decimal" aria-label="${esc(d.name)} yüzdesi" value="${e?.percentages?.[d.id]??(100/formDoctors.length).toFixed(2)}" placeholder="%"></div>`).join('')}
       <p class="hint" id="share-hint"></p></section>
       <section class="card"><div class="toolbar"><button type="submit">${e?'Değişiklikleri kaydet':'Gideri kaydet'}</button><button type="button" id="cancel" class="secondary">Vazgeç</button></div></section>
     </form>`;
@@ -452,11 +474,12 @@ async function submitExpense(event,existing){
   const f=event.target,amount=parseAmount(f.elements.amount.value);
   const expenseMonth=f.elements.date.value.slice(0,7);
   const pooled=poolStatus().active;
-  const ids=pooled?(existing?.participants||db.doctors.map(d=>d.id)):[...document.querySelectorAll('[data-participant]:checked')].map(el=>el.dataset.participant);
+  const expenseMonthDoctors=db.doctors.filter(d=>!isArchivedInMonth(d,expenseMonth));
+  const ids=pooled?(existing?.participants||expenseMonthDoctors.map(d=>d.id)):[...document.querySelectorAll('[data-participant]:checked')].map(el=>el.dataset.participant);
   const method=pooled?(existing?.method||'equal'):f.elements.method.value;
   const percentages=pooled?{...(existing?.percentages||{})}:{};
   if(!Number.isSafeInteger(amount)||amount<=0){alert('Tutar sıfırdan büyük olmalı; en fazla iki ondalık basamak kullanın.');return}
-  if(!ids.length){alert('En az bir hekim seçin.');return}
+  if(!ids.length){alert('En az bir aktif hekim seçin.');return}
   if(method==='custom'&&!pooled){
     let sum=0;
     for(const id of ids){
@@ -481,14 +504,36 @@ async function submitExpense(event,existing){
 }
 async function addDoctor(event){
   event.preventDefault();const name=event.target.elements.name.value.trim();if(!name)return;
-  if(db.doctors.some(d=>d.name.toLocaleLowerCase('tr')===name.toLocaleLowerCase('tr'))){alert('Bu hekim zaten kayıtlı.');return}
+  const existing=db.doctors.find(d=>d.name.toLocaleLowerCase('tr')===name.toLocaleLowerCase('tr'));
+  if(existing){
+    alert(isArchivedNow(existing)?'Bu hekim arşivde kayıtlı. Arşivdeki hekimler bölümünden aktifleştirebilirsiniz.':'Bu hekim zaten kayıtlı.');
+    return;
+  }
   await mutate(()=>db.doctors.push({id:uid(),name}));
 }
 async function deleteDoctor(id){
-  if(db.expenses.some(e=>e.paidBy===id||e.participants.includes(id))||db.transfers.some(t=>t.from===id||t.to===id)||(db.allowances||[]).some(a=>a.doctorId===id)){
-    alert('Bu hekimin gider veya transfer kaydı var. Önce ilişkili kayıtları düzenleyin.');return;
+  const person=db.doctors.find(d=>d.id===id);
+  if(!person||isArchivedNow(person))return;
+  if(doctorHasHistory(id)){
+    if(!confirm(person.name+' için geçmiş gider, ödenek veya transfer kayıtları var.\n\nBu kayıtları silmeden hekimi bu aydan itibaren arşivlemek ister misiniz? Geçmiş hesaplaşmalar korunacak.'))return;
+    await mutate(()=>{
+      person.inactivePeriods ||= [];
+      person.inactivePeriods.push({from:monthNow(),to:null});
+    });
+    return;
   }
-  if(confirm(`${doctor(id)} silinsin mi?`))await mutate(()=>{db.doctors=db.doctors.filter(d=>d.id!==id)});
+  if(confirm(person.name+' için finansal kayıt bulunmuyor. Hekim kalıcı olarak silinsin mi?')){
+    await mutate(()=>{db.doctors=db.doctors.filter(d=>d.id!==id)});
+  }
+}
+async function restoreDoctor(id){
+  const person=db.doctors.find(d=>d.id===id);
+  if(!person||!isArchivedNow(person))return;
+  if(!confirm(person.name+' yeniden aktif hekim listesine alınsın mı?'))return;
+  await mutate(()=>{
+    const interval=person.inactivePeriods?.find(period=>period.to===null);
+    if(interval)interval.to=monthNow();
+  });
 }
 async function deleteExpense(id){
   if(!confirm('Bu gider silinsin mi?'))return;
@@ -520,6 +565,18 @@ function validateBackup(x){
   const doctorIds=new Set();
   for(const d of x.doctors){
     if(!d||!isId(d.id)||typeof d.name!=='string'||!d.name.trim()||d.name.length>100||doctorIds.has(d.id))throw Error('Hekim kayıtları geçersiz');
+    if(d.inactivePeriods!==undefined){
+      if(!Array.isArray(d.inactivePeriods)||d.inactivePeriods.length>200)throw Error('Hekim arşiv kayıtları geçersiz');
+      let previousEnd='0000-00';
+      for(const interval of d.inactivePeriods){
+        if(!interval||typeof interval.from!=='string'
+          ||!/^\d{4}-(0[1-9]|1[0-2])$/.test(interval.from)
+          ||!(interval.to===null||(typeof interval.to==='string'&&/^\d{4}-(0[1-9]|1[0-2])$/.test(interval.to)))
+          ||interval.from<previousEnd||(interval.to!==null&&interval.to<interval.from))
+          throw Error('Hekim arşiv tarihleri geçersiz');
+        previousEnd=interval.to===null?'9999-12':interval.to;
+      }
+    }
     doctorIds.add(d.id);
   }
   const expenses=new Set();
