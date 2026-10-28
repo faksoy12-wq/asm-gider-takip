@@ -258,6 +258,7 @@ function accountPage(){
     <form id="login-form"><label>E-posta</label><input name="email" type="email" autocomplete="email" required>
     <label>Şifre</label><input name="password" type="password" minlength="8" autocomplete="current-password" required>
     <div class="toolbar"><button name="action" value="login" type="submit">Giriş yap</button><button class="secondary" name="action" value="signup" type="submit">Yeni hesap oluştur</button></div></form>
+    <p id="auth-feedback" class="auth-feedback" aria-live="polite" hidden></p>
     <p class="form-note">Yeni hesap için e-posta doğrulaması gerekebilir. Şifrenizi yalnızca bu güvenli formda kullanın.</p></section></div>`;
   if(s.error&&!s.ready)return `<div class="auth-layout"><section class="card"><h1>ASM bağlantısı tamamlanamadı</h1><p class="warning">${esc(s.error)}</p><button id="retry-cloud" class="wide">Yeniden dene</button></section></div>`;
   if(!s.workspace)return `<div class="auth-layout"><section class="card"><div class="breadcrumb">HOŞ GELDİNİZ</div><h1>ASM çalışma alanı</h1>
@@ -496,17 +497,52 @@ async function sharePDFReport(){
     }
   }
 }
+function authErrorMessage(error,action){
+  const code=String(error?.code||'').toLowerCase();
+  const description=String(error?.message||'').toLowerCase();
+  const emailQuota=code==='over_email_send_rate_limit'||description.includes('email rate limit exceeded');
+  if(emailQuota)return 'Doğrulama e-postası gönderilemedi: Bu ASM projesinin e-posta gönderim sınırına ulaşıldı. Tekrar tekrar kayıt denemek kotayı açmaz. Bir süre sonra yeniden deneyebilirsiniz; daha fazla hekim kaydı için özel e-posta (SMTP) gönderimi kurulmalıdır.';
+  if(code==='email_address_not_authorized'||description.includes('email address not authorized'))return 'Bu e-posta adresine doğrulama mesajı gönderilemiyor. Varsayılan Supabase e-posta hizmeti proje ekibi dışındaki adresleri kısıtlıyor. Hekim üyelikleri için özel SMTP kurulması gerekiyor.';
+  if(code==='over_request_rate_limit'||code==='over_email_send_rate_limit'||Number(error?.status)===429)return 'Çok sayıda istek yapıldığı için işlem geçici olarak sınırlandı. Bir süre sonra tekrar deneyin.';
+  if(code==='email_not_confirmed'||description.includes('email not confirmed'))return 'E-posta adresi henüz doğrulanmamış. Gelen kutunuzu ve spam klasörünü kontrol edin.';
+  if(code==='invalid_credentials'||description.includes('invalid login credentials'))return 'E-posta adresi veya şifre hatalı. Bilgilerinizi kontrol edin.';
+  if(code==='user_already_exists'||description.includes('user already registered'))return 'Bu adresle daha önce hesap oluşturulmuş olabilir. Lütfen giriş yapmayı deneyin.';
+  return (action==='signup'?'Hesap oluşturulamadı. ':'Giriş yapılamadı. ')+'Lütfen bilgilerinizi ve internet bağlantınızı kontrol edip yeniden deneyin.';
+}
 async function authSubmit(event){
-  event.preventDefault();if(!ensureEditable())return;busy=true;
+  event.preventDefault();
+  if(!ensureEditable())return;
   const form=event.target,action=event.submitter?.value||'login';
   const email=form.elements.email.value.trim(),password=form.elements.password.value;
-  try {
+  const buttons=Array.from(form.querySelectorAll('button[type="submit"]'));
+  const feedback=form.parentElement?.querySelector('#auth-feedback');
+  function showFeedback(text,success=false){
+    if(!feedback){alert(text);return;}
+    feedback.textContent=text;
+    feedback.className='auth-feedback '+(success?'info':'warning');
+    feedback.setAttribute('role',success?'status':'alert');
+    feedback.hidden=false;
+  }
+  busy=true;
+  buttons.forEach(button=>button.disabled=true);
+  if(feedback){feedback.hidden=true;feedback.textContent='';}
+  try{
     if(action==='signup'){
       const hasSession=await cloud.register(email,password);
-      if(!hasSession)alert('Kayıt alındı. E-posta adresinize gelen doğrulama bağlantısını açın, ardından giriş yapın.');
-    } else await cloud.login(email,password);
-  }catch(e){alert('Giriş işlemi başarısız: '+e.message)}
-  finally{busy=false;render()}
+      if(!hasSession){
+        showFeedback('Kayıt isteği alındı. E-posta adresinize doğrulama bağlantısı geldiyse açıp ardından giriş yapın.',true);
+        return;
+      }
+    }else{
+      await cloud.login(email,password);
+    }
+    render();
+  }catch(error){
+    showFeedback(authErrorMessage(error,action));
+  }finally{
+    busy=false;
+    buttons.forEach(button=>button.disabled=false);
+  }
 }
 async function createWorkspace(event){
   event.preventDefault();if(!ensureEditable())return;busy=true;

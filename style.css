@@ -382,3 +382,12 @@ input:focus, select:focus, textarea:focus { border-color: #29968b; }
   .allowance-row__amount button{padding:7px 9px;font-size:11px}
   .allowance-breakdown__grid{grid-template-columns:minmax(0,1fr) minmax(95px,auto);gap:7px}
 }
+
+/* v11: clear inline authentication feedback without intrusive browser alerts. */
+.auth-feedback {
+  margin: 12px 0 0;
+  font-size: 13px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+.auth-feedback[hidden] { display: none; }
