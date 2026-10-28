@@ -111,3 +111,11 @@ Hekimler ekranı yalnızca hekim kayıtlarını gösterir. İsteğe bağlı JSON
 - Arşivlenmiş hekim, gelecek ayların gider girişlerinde ve ödeneklerin otomatik aktarımında yer almaz. Arşivleme ayına veya önceki dönemlere ait gerçek finansal kaydı varsa, geçmiş hesapların bölüşümü değişmemesi için o ilgili ayın hesaplaşmasında yer almaya devam eder.
 - Pasiflik tarihleri, her hekim için isteğe bağlı `inactivePeriods:[{from:"YYYY-MM",to:null|"YYYY-MM"}]` aralıklarında tutulur. Geri alınan bir hekim önceki boş dönemlere geriye dönük dahil edilmez. Eski JSON yedekleri aynı şekilde kullanılabilir.
 - Yedek doğrulaması arşiv tarih sırasını kontrol eder; mevcut ortak Supabase veritabanı şemasının değiştirilmesi gerekmez.
+
+## v15 — Bu cihazdaki hekim ve giderde varsayılan ödeyen
+
+- **Hesabım → Bu cihazdaki hekim** bölümünden, o cihazda oturum açmış kullanıcının hekim kimliği seçilir. Tercih, her cihazın tarayıcı yerel depolamasında (localStorage) `asm-device-doctor-v1:<workspace_id>:<user_id>` anahtarıyla saklanır. Ortak Supabase defterine yazılmaz.
+- Yeni gider formundaki **Ödemeyi yapan hekim** otomatik olarak o kimliğe gelir; kullanıcı gider özelinde değiştirebilir. Bu cihazda kimlik seçilmediyse alan **boş** başlar ve hekim seçilmesi zorunludur (ilk hekimin/yöneticinin yanlışlıkla otomatik seçilmesi önlendi).
+- Mevcut gideri düzenlerken eskiden kayıtlı ödeyen hekim aynen seçilir. Cihaz tercihi eski kayıtlara uygulanmaz.
+- Arşivlenen/hekim listesinden silinen bir kişi cihaz tercihi olarak otomatik uygulanmaz. Yeni hekim seçimi için Hesabım'a dönülür.
+- Bu ayar erişim yetkisi veya sunucuda hekim-kullanıcı doğrulaması sağlamaz; mevcut düzenleme izinleri değişmemiştir.

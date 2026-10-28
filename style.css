@@ -441,3 +441,18 @@ input:focus, select:focus, textarea:focus { border-color: #29968b; }
   .doctor-roster-row {grid-template-columns:minmax(0,1fr) max-content;gap:8px;}
   .doctor-roster-row button {min-width:72px;padding:8px 9px;}
 }
+
+/* v15 · Per-device default payer, with explicit consent and clear account scope. */
+.device-doctor-settings .row {margin-bottom:10px;}
+.device-doctor-settings select {width:100%;max-width:100%;margin-bottom:12px;}
+.device-doctor-settings .toolbar {margin:0 0 10px;}
+.device-doctor-note {
+  margin:5px 0 12px;
+  padding:9px 11px;
+  border-radius:10px;
+  background:#e9f3f1;
+  color:#245a54;
+  font-size:12px;
+  line-height:1.45;
+}
+.device-doctor-settings .fine {margin-bottom:0;}

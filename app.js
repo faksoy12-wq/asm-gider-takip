@@ -15,6 +15,62 @@ let monthManuallySelected=false;
 let autoRefreshAt=0, autoRefreshPending=false;
 const cloud=window.ASMCloud;
 const state=()=>cloud.status();
+const DEVICE_DOCTOR_PREFIX='asm-device-doctor-v1';
+function deviceDoctorStorageKey(){
+  const s=state();
+  // A preference on one device must never leak across users or ASM workspaces.
+  if(!s.enabled)return DEVICE_DOCTOR_PREFIX+':local';
+  if(!s.user?.id||!s.workspace?.id)return null;
+  return DEVICE_DOCTOR_PREFIX+':'+s.workspace.id+':'+s.user.id;
+}
+function selectedDeviceDoctorId(){
+  const key=deviceDoctorStorageKey();
+  if(!key)return null;
+  try{
+    const doctorId=localStorage.getItem(key);
+    return db.doctors.some(d=>d.id===doctorId&&!isArchivedNow(d))?doctorId:null;
+  }catch{return null;}
+}
+function deviceDoctorSection(){
+  const active=db.doctors.filter(d=>!isArchivedNow(d));
+  const selected=selectedDeviceDoctorId();
+  return `<section class="card device-doctor-settings">
+    <div class="row wrap"><h2>Bu cihazdaki hekim</h2><span class="tag">Cihaza özel</span></div>
+    <p class="muted">Kendi adınızı bir kez seçin. Bu cihazda yeni gider eklediğinizde ödemeyi yapan hekim otomatik seçilir.</p>
+    ${active.length?`<form id="device-doctor-form">
+      <label for="device-doctor">Ben hangi hekimim?</label>
+      <select id="device-doctor" name="myDoctor" required>
+        <option value="" ${selected?'':'selected'} disabled>Hekim seçin</option>
+        ${active.map(d=>`<option value="${esc(d.id)}" ${selected===d.id?'selected':''}>${esc(d.name)}</option>`).join('')}
+      </select>
+      <div class="toolbar"><button type="submit">Hekim seçimimi kaydet</button>
+        ${selected?'<button type="button" class="secondary" id="clear-device-doctor">Seçimi temizle</button>':''}
+      </div></form>
+      ${selected?`<p class="device-doctor-note">Bu cihazda seçili: <strong>${esc(doctor(selected))}</strong></p>`:
+      '<p class="device-doctor-note">Henüz bir hekim seçilmedi. Yeni giderlerde hekim alanı boş açılır.</p>'}`
+      :'<p class="muted">Hekim listesi henüz boş. Önce Hekimler bölümünden kayıt ekleyin.</p>'}
+    <p class="fine">Seçim yalnızca bu cihazda, bu oturum hesabı ve ASM için saklanır. Başkası adına gider eklerken hekimi değiştirebilirsiniz. Bu işlem kullanıcı yetkisi vermez.</p>
+  </section>`;
+}
+function saveDeviceDoctor(event){
+  event.preventDefault();
+  const key=deviceDoctorStorageKey();
+  const doctorId=event.target.elements.myDoctor.value;
+  if(!key)return;
+  if(!db.doctors.some(d=>d.id===doctorId&&!isArchivedNow(d))){
+    alert('Lütfen aktif hekimlerden birini seçin.');return;
+  }
+  try{localStorage.setItem(key,doctorId)}
+  catch{alert('Bu cihazda hekim tercihi kaydedilemedi. Tarayıcının depolama ayarlarını kontrol edin.');return}
+  render();
+}
+function clearDeviceDoctor(){
+  const key=deviceDoctorStorageKey();
+  if(!key)return;
+  try{localStorage.removeItem(key)}
+  catch{alert('Hekim tercihi temizlenemedi.');return}
+  render();
+}
 const poolStatus=()=>window.ASMAllowanceMath.analyze(db,month);
 const periodDoctors=(selected=month)=>window.ASMAllowanceMath.doctorsForMonth(db,selected);
 const isArchivedNow=doctorRecord=>window.ASMAllowanceMath.isArchived(doctorRecord,monthNow());
@@ -324,6 +380,7 @@ function accountPage(){
     <div class="muted">${esc(s.user.email)} · ${s.role==='owner'?'Yönetici':'Hekim / editör'}</div></div>
     <span class="tag"><span class="cloud-dot cloud-dot--online"></span> Buluta bağlı</span></div>
     <div class="toolbar"><button id="refresh-workspace" class="secondary">Güncel kayıtları getir</button><button id="logout" class="secondary">Çıkış yap</button></div></section>
+    ${deviceDoctorSection()}
     ${remoteEmpty&&hasLocal?`<section class="card"><h2>Bu cihazdan veri taşıma</h2><p class="muted">Cihazda daha önce kaydettiğiniz pilot kayıtları bulut ASM defterine aktarabilirsiniz. Bu işlem boş bulut defterini doldurur.</p><button id="migrate-local" class="wide">Yerel kayıtları buluta aktar</button></section>`:''}
     ${s.role==='owner'?`<section class="card"><h2>Hekim hesabı davet et</h2><p class="muted">Hekimin önce kendi e-postasıyla uygulamaya kayıt olup e-posta doğrulaması yapması gerekiyor. Sonra yöneticinin bu adresten üyelik vermesi yeterli.</p>
     <form id="add-member"><label>Hekimin kayıtlı e-postası</label><input name="email" type="email" autocomplete="off" placeholder="hekim@ornek.com" required><div class="toolbar"><button type="submit">Hesaba ASM erişimi ver</button></div></form></section>
@@ -384,6 +441,8 @@ function render(){
   $('#import')?.addEventListener('change',importData);
   $('#pdf')?.addEventListener('click',sharePDFReport);
   if ($('#pdf')) window.ASMPDF?.preload?.().catch(()=>{ /* Retried on tap. */ });
+  $('#device-doctor-form')?.addEventListener('submit',saveDeviceDoctor);
+  $('#clear-device-doctor')?.addEventListener('click',clearDeviceDoctor);
   $('#login-form')?.addEventListener('submit',authSubmit);
   $('#new-workspace')?.addEventListener('submit',createWorkspace);
   $('#add-member')?.addEventListener('submit',addMember);
@@ -426,6 +485,9 @@ function expenseForm(id){
     ||(e&&(e.paidBy===d.id||e.participants.includes(d.id))));
   if(!formDoctors.length){alert('Bu ay aktif hekim bulunmuyor. Önce Hekimler bölümünden bir hekim ekleyin veya arşivden geri alın.');navigate('doctors');return}
   const participants=e?.participants||formDoctors.map(d=>d.id);
+  // Editing an existing expense preserves its original payer. New expenses
+  // use this device's saved preference, never the first list entry.
+  const preferredPayer=e?.paidBy||(formDoctors.some(d=>d.id===selectedDeviceDoctorId())?selectedDeviceDoctorId():null);
   page='expenses';document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.page==='expenses'));
   $('#app').innerHTML=heading(e?'Gideri düzenle':'Yeni gider ekle',e?'Mevcut harcamayı güncelleyin':'Ödemeyi yapanı ve paylaşan hekimleri belirleyin')+`
     <form id="expense-form">
@@ -433,7 +495,12 @@ function expenseForm(id){
       <div class="field"><label>Tutar (₺) *</label><input name="amount" inputmode="decimal" type="text" required value="${e?(e.amount/100).toFixed(2).replace('.',','):''}" placeholder="8.400,00"></div>
       <div class="field"><label>Harcama tarihi *</label><input type="date" name="date" required value="${e?.date||dateForNewExpense()}"></div></div>
       <label>Açıklama</label><textarea name="description" rows="2" maxlength="500" placeholder="Örn. Ekim ayı elektrik faturası">${esc(e?.description||'')}</textarea></section>
-      <section class="card"><h2>02 — Ödeme bilgileri</h2><div class="form-grid"><div class="field"><label>Ödemeyi yapan hekim *</label><select name="paidBy">${formDoctors.map(d=>`<option value="${esc(d.id)}" ${e?.paidBy===d.id?'selected':''}>${esc(d.name)}</option>`).join('')}</select></div>
+      <section class="card"><h2>02 — Ödeme bilgileri</h2><div class="form-grid"><div class="field"><label>Ödemeyi yapan hekim *</label><select name="paidBy" required>
+        <option value="" disabled ${preferredPayer?'':'selected'}>Hekim seçin</option>
+        ${formDoctors.map(d=>`<option value="${esc(d.id)}" ${preferredPayer===d.id?'selected':''}>${esc(d.name)}</option>`).join('')}
+        </select>
+        <p class="fine">${preferredPayer?'Bu cihazın hekim tercihi seçildi. Gerekirse değiştirebilirsiniz.':'Hekiminizi Hesabım → Bu cihazdaki hekim bölümünden bir kez seçebilirsiniz.'}</p>
+        </div>
       <div class="field"><label>Ödeme yöntemi</label><select name="paymentMethod">${[['bank','Banka havalesi / EFT'],['cash','Nakit'],['card','Kart']].map(([v,n])=>`<option value="${v}" ${e?.paymentMethod===v?'selected':''}>${n}</option>`).join('')}</select></div></div></section>
       <section class="card"><h2>03 — Gider paylaşımı</h2><label>Paylaştırma yöntemi</label><select name="method" id="method"><option value="equal" ${e?.method!=='custom'?'selected':''}>Eşit paylaştır</option><option value="custom" ${e?.method==='custom'?'selected':''}>Yüzdelere göre</option></select>
       <p class="hint">Bu giderden sorumlu hekimleri seçin. Hekim isminin yanındaki alan özel paylaşım yüzdesidir.</p>
@@ -480,6 +547,10 @@ async function submitExpense(event,existing){
   const percentages=pooled?{...(existing?.percentages||{})}:{};
   if(!Number.isSafeInteger(amount)||amount<=0){alert('Tutar sıfırdan büyük olmalı; en fazla iki ondalık basamak kullanın.');return}
   if(!ids.length){alert('En az bir aktif hekim seçin.');return}
+  if(!f.elements.paidBy.value||!db.doctors.some(d=>d.id===f.elements.paidBy.value
+    &&(!isArchivedInMonth(d,expenseMonth)||existing?.paidBy===d.id))){
+    alert('Ödemeyi yapan hekimi seçin.');return;
+  }
   if(method==='custom'&&!pooled){
     let sum=0;
     for(const id of ids){
