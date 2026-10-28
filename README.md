@@ -65,3 +65,10 @@ node --test tests/ledger.test.cjs
 ```
 
 Bu testler hesaplama ve sözdizimini doğrular; gerçek Supabase uygulaması / API bağlantısı ayrıca test edilmelidir.
+
+## Uygulama simgesi (v4)
+
+ASM Gider Takip'in ana ekran simgesi, stetoskop ve hekimlik asası ile yükselen finans grafiğini birleştirir.
+iOS için `apple-touch-icon.png`, Android için PWA manifestindeki 192/512 piksel ve maskable simge kullanılır.
+Önceden ana ekrana eklenen simgeyi yenilemek için uygulamanın kısayolunu kaldırıp uygulamayı tekrar ana ekrana ekleyin.
+Bu işlem Supabase'de saklanan kayıtları silmez; yine de önemli veriler için yedek önerilir.
