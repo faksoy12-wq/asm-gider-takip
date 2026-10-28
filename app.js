@@ -118,7 +118,7 @@ function allowanceSection(){
   const pool=poolStatus();
   return `<section class="card">
     <div class="row wrap"><h2>Bu ay yatan ödenekler</h2><span class="tag">${pool.recordedCount} / ${pool.doctorCount} kayıt</span></div>
-    <p class="muted">Her hekim adına yatan ödeneği girin. 0 TL ödenek için de sıfır tutarlı kayıt oluşturun. Kalan para bütün hekimlerin kayıtları tamamlanınca eşitlenir.</p>
+    <p class="muted">Her hekim adına yatan ödeneği girin. 0 TL ödenek için de sıfır tutarlı kayıt oluşturun. Kalan para bütün hekimlerin kayıtları tamamlanınca eşitlenir. Bu sürümde ASM yetkilileri tüm hekimlerin tutarlarını düzenleyebilir.</p>
     ${db.doctors.map(d=>{
       const record=(db.allowances||[]).find(a=>a.doctorId===d.id&&a.month===month);
       return `<div class="allowance-row"><div class="allowance-row__person">
@@ -476,7 +476,7 @@ async function sharePDFReport(){
   const button=$('#pdf');
   if(!button || button.disabled) return;
   const rows=selectedMonth().slice();
-  if(!rows.length){alert('Bu ay için paylaşılacak gider bulunmuyor.');return;}
+  if(!rows.length&&!poolStatus().active){alert('Bu ay için paylaşılacak gider veya ödenek bulunmuyor.');return;}
   button.disabled=true;
   button.textContent='PDF hazırlanıyor…';
   try{
