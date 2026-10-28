@@ -152,10 +152,9 @@ input:focus, select:focus, textarea:focus { border-color: #29968b; }
 .app-footer {
   border-top: 1px solid var(--line);
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 11px; padding: 23px 20px 26px;
+  gap: 0; padding: 15px 20px 18px;
   background: rgba(255,255,255,.65);
 }
-.app-footer #footer-note { margin: 0; text-align: center; color: #7a8b9b; font-size: 11px; }
 .developer-credit {
   display: inline-flex; align-items: center; justify-content: center;
   gap: 8px; max-width: 100%; padding: 8px 13px;
@@ -275,17 +274,10 @@ input:focus, select:focus, textarea:focus { border-color: #29968b; }
 .app-footer {
   flex: 0 0 auto;
   margin-top: auto;
-  gap: 6px;
+  gap: 0;
   padding: 14px 18px 17px;
   border-top: 1px solid #e5edef;
   background: rgba(255,255,255,.55);
-}
-.app-footer #footer-note {
-  max-width: 580px;
-  margin: 0;
-  color: #8596a1;
-  font-size: 10.5px;
-  line-height: 1.45;
 }
 .developer-credit {
   display: inline-flex;
@@ -318,9 +310,8 @@ input:focus, select:focus, textarea:focus { border-color: #29968b; }
   .shell > main { min-height: 0; }
   .app-footer {
     padding: 12px 14px 16px;
-    gap: 6px;
+    gap: 0;
   }
-  .app-footer #footer-note { font-size: 10px; }
   .developer-credit { font-size: 10px; }
   .developer-credit strong { font-size: 10.5px; }
 }
@@ -470,13 +461,6 @@ input:focus, select:focus, textarea:focus { border-color: #29968b; }
 .auth-intro .breadcrumb { display:block; margin:0 0 7px; letter-spacing:.045em; font-size:10px; }
 .auth-intro h1 { font-size:clamp(23px, 3vw, 28px); letter-spacing:-.035em; margin:0 0 9px; }
 .auth-intro .muted { margin:0; line-height:1.65; font-size:13px; }
-.auth-symbol {
-  width:48px; height:48px;
-  border-radius:14px; display:grid; place-items:center;
-  color:#116a64; background:#e7f5f0;
-  margin-bottom:16px;
-}
-.auth-symbol svg { width:26px; height:26px; }
 .auth-mode-switch {
   display:grid; grid-template-columns:repeat(2,minmax(0,1fr));
   gap:5px; padding:5px; margin:23px 0 22px;

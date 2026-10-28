@@ -361,9 +361,7 @@ function accountPage(){
     <div class="toolbar"><button class="secondary" data-go="home">Yerel moda dön</button></div></section>`+dataManagement();
   if(s.error&&!s.user)return `<div class="auth-layout"><section class="card"><h1>Bağlantı hatası</h1><p class="warning">${esc(s.error)}</p><button id="retry-cloud" class="wide">Yeniden dene</button></section></div>`;
   if(!s.user)return `<div class="auth-layout"><section class="card auth-card">
-    <div class="auth-intro"><div class="auth-symbol" aria-hidden="true">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round">
-        <rect x="4" y="4" width="16" height="16" rx="5"/><path d="M12 8v8M8 12h8"/></svg></div>
+    <div class="auth-intro">
       <span class="breadcrumb">GÜVENLİ ASM ERİŞİMİ</span>
       <h1>${authUI.mode==='login'?'Tekrar hoş geldiniz':'ASM Gider Takip’e katılın'}</h1>
       <p class="muted">${authUI.mode==='login'?'Giderlerinizi ve ortak hesaplaşmaları görüntülemek için giriş yapın.':'Kişisel hesabınızı oluşturun. ASM yöneticisi sizi ortak çalışma alanına ekleyebilir.'}</p>
@@ -451,7 +449,6 @@ function render(){
   $('#account').textContent=booting?'Hazırlanıyor':s.enabled?(s.ready?'Hesabım':'Giriş yap'):'Bulut / Hesap';
   const online=Boolean(s.enabled&&s.ready&&s.workspace);
   $('#cloud-status').innerHTML=`<span class="cloud-dot ${online&&!s.error?'cloud-dot--online':''}"></span>${booting?'Güvenli bağlantı hazırlanıyor':online?(s.error?'Ortak ASM · yenileme hatası':'Ortak ASM · güncel'):s.enabled?'Giriş gerekli':s.error?'Bağlantı hatası':'Yerel pilot'}`;
-  $('#footer-note').textContent=booting?'Güvenli bağlantı hazırlanıyor…':online?'Veriler ortak ASM veritabanında saklanır. Raporlar için düzenli yedek önerilir.':'Bu sürümde veriler yalnızca bu cihazda saklanır. Düzenli yedek alın.';
   if(booting){$('#app').innerHTML=launchScreen();return;}
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.page===view));
   const pages={home,expenses,doctors:doctorsPage,settlement,account:accountPage};
