@@ -9,7 +9,7 @@ Aile Sağlığı Merkezleri için hekim giderlerini, paylaşım yüzdelerini, ki
 
 - 320–1024 piksel arasında uyumlu kart, form, ödeme ve hesaplaşma satırları; taşma ve sağa-sola kayma düzeltmeleri
 - Eşit / yüzdesel paylaşım, kuruş bazında yuvarlama, ay sonu net borç/alacak ve transfer listesi
-- Yerel cihaz sürümü için JSON yedek, içe aktarma ve CSV dışa aktarma
+- Yerel cihaz sürümü için JSON yedek ve içe aktarma; aylık gider listesini PDF hazırlayıp desteklenen cihazlarda paylaşma (diğerlerinde PDF indirme)
 - Supabase bağlantısına hazır oturum açma ve kayıt ekranları
 - ASM oluşturma, yönetici tarafından doğrulanmış hesabı ASM'ye ekleme/çıkarma
 - Ekip üyelerinin paylaştığı **tek** bulut defteri; PostgreSQL row-level security (RLS)

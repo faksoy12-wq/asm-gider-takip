@@ -99,7 +99,7 @@ function home(){
 function expenses(){
   const list=selectedMonth().slice().sort((a,b)=>b.date.localeCompare(a.date));
   return heading('Giderler','Harcamaları kaydedin ve düzenleyin',true)+`
-    <div class="toolbar"><button id="add-expense">+ Yeni gider ekle</button><button class="secondary" id="csv">CSV dışa aktar</button></div>
+    <div class="toolbar"><button id="add-expense">+ Yeni gider ekle</button><button class="secondary" id="pdf" type="button">PDF paylaş</button></div>
     <section class="card">${list.map(expenseRow).join('')||'<div class="empty">Bu ay gider bulunmuyor.</div>'}</section>`;
 }
 function doctorsPage(){
@@ -203,7 +203,8 @@ function render(){
   $('#add-doctor')?.addEventListener('submit',addDoctor);
   $('#export')?.addEventListener('click',exportData);
   $('#import')?.addEventListener('change',importData);
-  $('#csv')?.addEventListener('click',exportCSV);
+  $('#pdf')?.addEventListener('click',sharePDFReport);
+  if ($('#pdf')) window.ASMPDF?.preload?.().catch(()=>{ /* Retried on tap. */ });
   $('#login-form')?.addEventListener('submit',authSubmit);
   $('#new-workspace')?.addEventListener('submit',createWorkspace);
   $('#add-member')?.addEventListener('submit',addMember);
@@ -333,11 +334,28 @@ async function importData(event){
     await mutate(()=>{db=imported});
   }catch(e){alert('Yedek okunamadı: '+e.message)}finally{event.target.value=''}
 }
-function exportCSV(){
-  const rows=[['Tarih','Kategori','Tutar TL','Ödeyen','Açıklama','Paylaşım','Hekimler'],
-    ...selectedMonth().map(e=>[e.date,e.category,(e.amount/100).toFixed(2),doctor(e.paidBy),e.description,e.method,e.participants.map(doctor).join('; ')])];
-  const csv='\ufeff'+rows.map(row=>row.map(value=>'"'+String(value??'').replace(/^[=+@-]/,match=>"'"+match).replace(/"/g,'""')+'"').join(';')).join('\r\n');
-  download('asm-gider-'+month+'.csv',csv,'text/csv;charset=utf-8');
+async function sharePDFReport(){
+  const button=$('#pdf');
+  if(!button || button.disabled) return;
+  const rows=selectedMonth().slice();
+  if(!rows.length){alert('Bu ay için paylaşılacak gider bulunmuyor.');return;}
+  button.disabled=true;
+  button.textContent='PDF hazırlanıyor…';
+  try{
+    await window.ASMPDF.share({
+      month,
+      workspaceName:state().workspace?.name||'ASM Gider Takip',
+      doctors:db.doctors.map(d=>({id:d.id,name:d.name})),
+      expenses:rows
+    });
+  }catch(error){
+    alert('PDF hazırlanamadı: '+(error?.message||'Lütfen tekrar deneyin.'));
+  }finally{
+    if(button.isConnected){
+      button.disabled=false;
+      button.textContent='PDF paylaş';
+    }
+  }
 }
 async function authSubmit(event){
   event.preventDefault();if(!ensureEditable())return;busy=true;
