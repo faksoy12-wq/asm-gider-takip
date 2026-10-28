@@ -12,9 +12,9 @@
   <link rel="icon" href="./favicon-48.png?v=4" type="image/png" sizes="48x48">
   <link rel="apple-touch-icon" href="./apple-touch-icon.png?v=4" sizes="180x180">
   <title>ASM Gider Takip</title>
-  <link rel="stylesheet" href="./style.css">
+  <link rel="stylesheet" href="./style.css?v=5">
 </head>
-<body>
+<body class="app-booting">
   <div class="shell">
     <header>
       <div class="brand">
@@ -22,30 +22,37 @@
         <div class="brand-copy">
           <strong>ASM Gider Takip</strong>
           <small>Hekimler arası gider yönetimi</small>
-          <span id="cloud-status" class="cloud-status"><span class="cloud-dot"></span>Yerel pilot</span>
+          <span id="cloud-status" class="cloud-status"><span class="cloud-dot"></span>Güvenli bağlantı hazırlanıyor</span>
         </div>
       </div>
       <div class="header-actions">
-        <button id="account" class="secondary" type="button">Hesabım</button>
+        <button id="account" class="secondary" type="button" disabled>Hazırlanıyor</button>
         <button id="install" class="secondary" type="button" hidden>Yükle</button>
       </div>
     </header>
-    <nav id="nav" aria-label="Ana menü">
+    <nav id="nav" aria-label="Ana menü" hidden>
       <button type="button" data-page="home" class="active"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m3 10 9-7 9 7"/><path d="M5 9v11h14V9"/><path d="M9 20v-7h6v7"/></svg></span><span class="nav-label">Özet</span></button>
       <button type="button" data-page="expenses"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg></span><span class="nav-label">Giderler</span></button>
       <button type="button" data-page="doctors"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20v-2a6 6 0 0 1 12 0v2M17 8h4M19 6v4M17 20h4"/></svg></span><span class="nav-label">Hekimler</span></button>
       <button type="button" data-page="settlement"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 7h16m-4-4 4 4-4 4M20 17H4m4-4-4 4 4 4"/></svg></span><span class="nav-label">Hesaplaşma</span></button>
     </nav>
-    <main id="app" aria-live="polite"></main>
+    <main id="app" aria-live="polite">
+      <div class="launch-screen" role="status" aria-label="Uygulama açılıyor">
+        <img class="launch-screen__icon" src="./icon-192.png?v=4" width="76" height="76" alt="">
+        <strong class="launch-screen__title">ASM Gider Takip</strong>
+        <span class="launch-screen__subtitle">Güvenli oturum hazırlanıyor</span>
+        <span class="launch-screen__spinner" aria-hidden="true"></span>
+      </div>
+    </main>
     <footer class="app-footer">
-      <p id="footer-note">Veriler yalnızca bu cihazda saklanır. Düzenli yedek alın.</p>
+      <p id="footer-note">Güvenli bağlantı hazırlanıyor…</p>
       <div class="developer-credit" aria-label="Geliştiren Dr. Furkan Aksoy">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 1.7 5.3L19 10l-5.3 1.7L12 17l-1.7-5.3L5 10l5.3-1.7z"/><path d="m19 16 .7 2.3L22 19l-2.3.7L19 22l-.7-2.3L16 19l2.3-.7z"/></svg>
         <span>Geliştiren <strong>Dr. Furkan Aksoy</strong></span>
       </div>
     </footer>
   </div>
-  <script src="./cloud.js" defer></script>
-  <script src="./app.js" defer></script>
+  <script src="./cloud.js?v=5" defer></script>
+  <script src="./app.js?v=5" defer></script>
 </body>
 </html>

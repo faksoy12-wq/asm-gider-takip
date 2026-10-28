@@ -5,8 +5,14 @@
  * The SDK is only loaded if a Vercel project has Supabase URL + publishable key configured.
  */
 window.ASMCloud = (() => {
-  const state = {enabled:false,loading:true,ready:false,user:null,workspace:null,role:null,revision:0,members:[],error:null};
-  let client=null, listener=()=>{};
+  const state = {enabled:false,loading:true,resolving:false,ready:false,user:null,workspace:null,role:null,revision:0,members:[],error:null};
+  let client=null, listener=()=>{}, pendingWorkspaceLoad=null;
+  function setUser(user){
+    if(state.user?.id!==user?.id){
+      state.workspace=null;state.role=null;state.ready=false;state.members=[];state.revision=0;
+    }
+    state.user=user;
+  }
   const changed=()=>listener();
   const message = error => error?.message || 'Bilinmeyen bir hata oluştu';
   const empty = () => ({doctors:[],expenses:[],transfers:[]});
@@ -26,9 +32,9 @@ window.ASMCloud = (() => {
     listener=onChange;
     try {
       const response=await fetch('/api/public-config',{cache:'no-store'});
-      if(!response.ok){state.loading=false;changed();return;}
+      if(!response.ok)throw new Error('Bağlantı kurulamadı. İnternet bağlantınızı kontrol ederek yeniden deneyin.');
       const config=await response.json();
-      if(!config.enabled){state.loading=false;changed();return;}
+      if(!config.enabled)return;
       state.enabled=true;
       await loadSDK();
       client=window.supabase.createClient(config.url,config.publishableKey,{
@@ -39,15 +45,15 @@ window.ASMCloud = (() => {
       if(sessionResult.data?.session){
         const result=await client.auth.getUser();
         if(result.error)throw result.error;
-        state.user=result.data?.user||null;
-      } else state.user=null;
+        setUser(result.data?.user||null);
+      } else setUser(null);
       if(state.user)await loadWorkspace();
       client.auth.onAuthStateChange((event,session)=>{
         // Avoid querying Supabase from inside an onAuthStateChange callback.
         if(event==='SIGNED_OUT'){
-          state.user=null;state.workspace=null;state.ready=false;state.members=[];state.revision=0;changed();
+          setUser(null);state.resolving=false;changed();
         } else if ((event==='SIGNED_IN'||event==='USER_UPDATED') && session?.user?.id!==state.user?.id){
-          state.user=session.user;
+          setUser(session.user);
           Promise.resolve().then(()=>loadWorkspace()).catch(e=>{state.error=message(e);changed()});
         }
       });
@@ -55,48 +61,71 @@ window.ASMCloud = (() => {
     finally {state.loading=false;changed();}
   }
 
-  async function loadWorkspace() {
-    if(!client||!state.user)return null;
-    state.ready=false;changed();
-    const {data,error}=await client.from('asm_members')
-      .select('workspace_id,role,asm_workspaces(name)').eq('user_id',state.user.id);
-    if(error)throw error;
-    const preferred=localStorage.getItem('asm-workspace-preferred');
-    const membership=(data||[]).find(m=>m.workspace_id===preferred)||data?.[0];
-    if(!membership){state.workspace=null;state.members=[];state.revision=0;changed();return null;}
-    state.workspace={id:membership.workspace_id,name:membership.asm_workspaces?.name||'ASM'};
-    state.role=membership.role;
-    localStorage.setItem('asm-workspace-preferred',state.workspace.id);
-    const {data:ledger,error:loadErr}=await client.from('asm_ledgers')
-      .select('content,revision').eq('workspace_id',state.workspace.id).single();
-    if(loadErr)throw loadErr;
-    const dataValue=ledger.content||empty();
-    state.revision=ledger.revision;
-    state.ready=true;
-    state.error=null;
-    changed(dataValue);
-    return dataValue;
+  function loadWorkspace() {
+    if(!client||!state.user)return Promise.resolve(null);
+    // Avoid two overlapping requests when Supabase emits SIGNED_IN during login.
+    if(pendingWorkspaceLoad)return pendingWorkspaceLoad;
+    const userId=state.user.id;
+    if(!state.ready){state.resolving=true;changed();}
+    const request=(async()=>{
+      let loadedData=null;
+      try {
+        const {data,error}=await client.from('asm_members')
+          .select('workspace_id,role,asm_workspaces(name)').eq('user_id',userId);
+        if(error)throw error;
+        if(state.user?.id!==userId)return null;
+        const preferred=localStorage.getItem('asm-workspace-preferred');
+        const membership=(data||[]).find(m=>m.workspace_id===preferred)||data?.[0];
+        if(!membership){
+          state.workspace=null;state.role=null;state.ready=false;state.members=[];state.revision=0;state.error=null;
+          return null;
+        }
+        const workspace={id:membership.workspace_id,name:membership.asm_workspaces?.name||'ASM'};
+        const {data:ledger,error:loadErr}=await client.from('asm_ledgers')
+          .select('content,revision').eq('workspace_id',workspace.id).single();
+        if(loadErr)throw loadErr;
+        if(state.user?.id!==userId)return null;
+        loadedData=ledger.content||empty();
+        state.workspace=workspace;
+        state.role=membership.role;
+        state.revision=ledger.revision;
+        state.ready=true;
+        state.error=null;
+        localStorage.setItem('asm-workspace-preferred',workspace.id);
+        return loadedData;
+      }catch(error){
+        if(state.user?.id===userId)state.error=message(error);
+        throw error;
+      }finally{
+        if(state.user?.id===userId){
+          state.resolving=false;
+          changed(loadedData);
+        }
+      }
+    })();
+    pendingWorkspaceLoad=request.finally(()=>{pendingWorkspaceLoad=null;});
+    return pendingWorkspaceLoad;
   }
 
   async function login(email,password) {
     if(!client)throw new Error('Bulut hizmeti henüz yapılandırılmadı');
     const {data,error}=await client.auth.signInWithPassword({email,password});
     if(error)throw error;
-    state.user=data.user;
+    setUser(data.user);
     await loadWorkspace();
   }
   async function register(email,password) {
     if(!client)throw new Error('Bulut hizmeti henüz yapılandırılmadı');
     const {data,error}=await client.auth.signUp({email,password,options:{emailRedirectTo:location.origin}});
     if(error)throw error;
-    if(data.session){state.user=data.user;await loadWorkspace();}
+    if(data.session){setUser(data.user);await loadWorkspace();}
     return Boolean(data.session);
   }
   async function logout(){
     if(!client)return;
     const {error}=await client.auth.signOut();
     if(error)throw error;
-    state.user=null;state.workspace=null;state.role=null;state.ready=false;state.members=[];changed();
+    setUser(null);state.resolving=false;changed();
   }
   async function createWorkspace(name){
     const {error}=await client.rpc('asm_create_workspace',{p_name:name});

@@ -128,7 +128,8 @@ function settlement(){
 }
 function accountPage(){
   const s=state();
-  if(s.loading)return `<div class="loading-state">Bulut bağlantısı kontrol ediliyor…</div>`;
+  if(s.loading||s.resolving)return launchScreen();
+  if(s.error&&!s.enabled)return `<div class="auth-layout"><section class="card"><h1>Bağlantı kurulamadı</h1><p class="warning">${esc(s.error)}</p><button id="retry-cloud" class="wide">Yeniden dene</button></section></div>`;
   if(!s.enabled)return heading('Bulut bağlantısı','İkinci aşama: ortak ASM veritabanı')+`
     <section class="card"><h2>Ortak veri sistemi henüz etkinleştirilmedi</h2>
     <p class="muted">Şu anda giderler sadece bu cihazda saklanıyor. Supabase projesi oluşturup SQL kurulumunu yaptıktan sonra Vercel'de <code>SUPABASE_URL</code> ve <code>SUPABASE_PUBLISHABLE_KEY</code> değişkenlerini ekleyerek çok kullanıcılı modu açabiliriz.</p>
@@ -141,6 +142,7 @@ function accountPage(){
     <label>Şifre</label><input name="password" type="password" minlength="8" autocomplete="current-password" required>
     <div class="toolbar"><button name="action" value="login" type="submit">Giriş yap</button><button class="secondary" name="action" value="signup" type="submit">Yeni hesap oluştur</button></div></form>
     <p class="form-note">Yeni hesap için e-posta doğrulaması gerekebilir. Şifrenizi yalnızca bu güvenli formda kullanın.</p></section></div>`;
+  if(s.error&&!s.ready)return `<div class="auth-layout"><section class="card"><h1>ASM bağlantısı tamamlanamadı</h1><p class="warning">${esc(s.error)}</p><button id="retry-cloud" class="wide">Yeniden dene</button></section></div>`;
   if(!s.workspace)return `<div class="auth-layout"><section class="card"><div class="breadcrumb">HOŞ GELDİNİZ</div><h1>ASM çalışma alanı</h1>
     <p class="muted">${esc(s.user.email)} hesabına giriş yapıldı. Henüz bu hesabın erişebildiği bir ASM bulunmuyor.</p>
     <form id="new-workspace"><label>ASM adı</label><input name="name" minlength="2" maxlength="100" required placeholder="Örn. Merkez ASM"><div class="toolbar"><button type="submit">Yeni ASM oluştur</button></div></form>
@@ -162,16 +164,28 @@ function accountPage(){
     <section class="card"><h2>Yedekleme</h2><div class="toolbar"><button id="export">Ortak defterin JSON yedeğini indir</button><label class="backup-control">JSON yedek yükle<input id="import" type="file" accept=".json,application/json"></label></div></section>`;
 }
 
+function launchScreen(){
+  return `<div class="launch-screen" role="status" aria-label="Uygulama açılıyor">
+    <img class="launch-screen__icon" src="./icon-192.png?v=4" width="76" height="76" alt="">
+    <strong class="launch-screen__title">ASM Gider Takip</strong>
+    <span class="launch-screen__subtitle">Güvenli oturum hazırlanıyor</span>
+    <span class="launch-screen__spinner" aria-hidden="true"></span>
+  </div>`;
+}
 function render(){
   const s=state();
-  const forced=s.enabled&&(!s.user||!s.workspace||!s.ready);
+  const booting=Boolean(s.loading||s.resolving);
+  const forced=booting||(s.enabled&&(!s.user||!s.workspace||!s.ready))||Boolean(s.error&&!s.enabled);
   const view=forced?'account':page;
+  document.body.classList.toggle('app-booting',booting);
   $('#nav').hidden=forced;
   $('#nav').style.display=forced?'none':'';
-  $('#account').textContent=s.enabled?(s.ready?'Hesabım':'Giriş yap'):'Bulut / Hesap';
+  $('#account').disabled=booting;
+  $('#account').textContent=booting?'Hazırlanıyor':s.enabled?(s.ready?'Hesabım':'Giriş yap'):'Bulut / Hesap';
   const online=Boolean(s.enabled&&s.ready&&s.workspace);
-  $('#cloud-status').innerHTML=`<span class="cloud-dot ${online?'cloud-dot--online':''}"></span>${online?'Ortak ASM · senkronize':s.enabled?'Giriş gerekli':'Yerel pilot'}`;
-  $('#footer-note').textContent=online?'Veriler ortak ASM veritabanında saklanır. Raporlar için düzenli yedek önerilir.':'Bu sürümde veriler yalnızca bu cihazda saklanır. Düzenli yedek alın.';
+  $('#cloud-status').innerHTML=`<span class="cloud-dot ${online?'cloud-dot--online':''}"></span>${booting?'Güvenli bağlantı hazırlanıyor':online?'Ortak ASM · senkronize':s.enabled?'Giriş gerekli':s.error?'Bağlantı hatası':'Yerel pilot'}`;
+  $('#footer-note').textContent=booting?'Güvenli bağlantı hazırlanıyor…':online?'Veriler ortak ASM veritabanında saklanır. Raporlar için düzenli yedek önerilir.':'Bu sürümde veriler yalnızca bu cihazda saklanır. Düzenli yedek alın.';
+  if(booting){$('#app').innerHTML=launchScreen();return;}
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.page===view));
   const pages={home,expenses,doctors:doctorsPage,settlement,account:accountPage};
   const root=$('#app');root.innerHTML=(notification?`<p class="warning">${esc(notification)}</p>`:'')+(pages[view]||home)();
