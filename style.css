@@ -259,3 +259,68 @@ input:focus, select:focus, textarea:focus { border-color: #29968b; }
 @keyframes asm-launch-spin {to{transform:rotate(360deg)}}
 .app-booting .app-footer {visibility: hidden;}
 @media(prefers-reduced-motion:reduce){.launch-screen__spinner{animation:none;border-top-color:#128378}}
+
+/* v6 · Lean app footer and one scrollable page without a fake blank bottom. */
+.shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+.shell > header { flex: 0 0 auto; }
+.shell > nav:not([hidden]) { flex: 0 0 auto; }
+.shell > main {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.app-footer {
+  flex: 0 0 auto;
+  margin-top: auto;
+  gap: 6px;
+  padding: 14px 18px 17px;
+  border-top: 1px solid #e5edef;
+  background: rgba(255,255,255,.55);
+}
+.app-footer #footer-note {
+  max-width: 580px;
+  margin: 0;
+  color: #8596a1;
+  font-size: 10.5px;
+  line-height: 1.45;
+}
+.developer-credit {
+  display: inline-flex;
+  width: auto;
+  max-width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-inline: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  color: #7a9691;
+  font-size: 10.5px;
+  font-weight: 400;
+  letter-spacing: 0;
+  line-height: 1.4;
+}
+.developer-credit svg { width: 11px; height: 11px; color: #65a093; opacity: .88; }
+.developer-credit strong { font-size: 11px; font-weight: 650; color: #426e65; letter-spacing: 0; }
+.app-booting .app-footer { display: none; }
+@media (max-width: 650px) {
+  .shell { padding-bottom: 0; }
+  body.has-bottom-nav .shell {
+    /* The navigation bar is fixed: reserve space only when it is visible. */
+    padding-bottom: calc(83px + env(safe-area-inset-bottom));
+  }
+  .shell > main { min-height: 0; }
+  .app-footer {
+    padding: 12px 14px 16px;
+    gap: 6px;
+  }
+  .app-footer #footer-note { font-size: 10px; }
+  .developer-credit { font-size: 10px; }
+  .developer-credit strong { font-size: 10.5px; }
+}

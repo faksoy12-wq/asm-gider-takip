@@ -178,6 +178,7 @@ function render(){
   const forced=booting||(s.enabled&&(!s.user||!s.workspace||!s.ready))||Boolean(s.error&&!s.enabled);
   const view=forced?'account':page;
   document.body.classList.toggle('app-booting',booting);
+  document.body.classList.toggle('has-bottom-nav',!forced);
   $('#nav').hidden=forced;
   $('#nav').style.display=forced?'none':'';
   $('#account').disabled=booting;
