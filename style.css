@@ -354,3 +354,31 @@ input:focus, select:focus, textarea:focus { border-color: #29968b; }
   .data-management__content { padding: 14px 16px 17px; }
 }
 @media(prefers-reduced-motion:reduce) { .data-management__chevron { transition: none; } }
+
+/* v9: monthly allowance inputs and doctor's reconciled balances */
+.allowance-row {
+  display:grid;grid-template-columns:minmax(0,1fr) minmax(115px,auto);
+  gap:12px;align-items:center;padding:13px 0;
+  border-bottom:1px solid #eaf0f3;min-width:0;
+}
+.allowance-row:last-of-type{border-bottom:0}
+.allowance-row__person,.allowance-row__amount{min-width:0;display:flex;flex-direction:column;gap:5px}
+.allowance-row__person strong{font-weight:720;overflow-wrap:anywhere}
+.allowance-row__person small{font-size:11px;color:#788a98}
+.allowance-row__amount{align-items:flex-end;gap:7px;font-variant-numeric:tabular-nums}
+.allowance-row__amount strong{font-size:15px;white-space:nowrap}
+.allowance-row__amount button{font-size:12px;padding:8px 11px}
+.allowance-breakdown{padding:15px 0;border-bottom:1px solid #e6eff1}
+.allowance-breakdown:last-of-type{border-bottom:0}
+.allowance-breakdown>strong{display:block;font-size:15px;color:#234354;margin-bottom:10px}
+.allowance-breakdown__grid{
+  display:grid;grid-template-columns:minmax(0,1fr) minmax(110px,auto);
+  gap:7px 13px;align-items:baseline;font-size:12px;min-width:0;
+}
+.allowance-breakdown__grid span{color:#60788a;min-width:0;overflow-wrap:anywhere}
+.allowance-breakdown__grid b{text-align:right;font-size:12px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+@media(max-width:380px){
+  .allowance-row{grid-template-columns:minmax(0,1fr) minmax(110px,auto);gap:8px}
+  .allowance-row__amount button{padding:7px 9px;font-size:11px}
+  .allowance-breakdown__grid{grid-template-columns:minmax(0,1fr) minmax(95px,auto);gap:7px}
+}

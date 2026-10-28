@@ -76,3 +76,12 @@ Bu işlem Supabase'de saklanan kayıtları silmez; yine de önemli veriler için
 ## Veri Yönetimi
 
 Hekimler ekranı yalnızca hekim kayıtlarını gösterir. İsteğe bağlı JSON yedek alma veya geri yükleme işlemleri **Hesabım → Veri Yönetimi** altındaki açılır alana taşınmıştır. Bulut kayıtları yedekten bağımsız olarak uygulama üzerinden kaydedilir; yükleme mevcut defteri değiştirmeden önce onay ister.
+
+## v9 — Aylık ödenek havuzu
+
+- **Hekimler** bölümünden ay seçilip her hekim adına yatan ödenek girilir. 0 TL de geçerli bir kayıttır; eksik girişten farklıdır.
+- Bir ay için **hiç ödenek kaydı yoksa** eski gider paylaşımı yöntemi çalışır. O ayın ilk ödenek kaydı yeni havuz modunu başlatır. **Tüm hekimlerin tutarları girilmeden** net kalan veya ödeme önerisi sunulmaz.
+- Hesaplama: **Toplam yatan ödenek − toplam harcama = eşit paylaştırılacak kalan**. Her hekimin hesabında kalan fiili tutar kendi ödeneğinden ödediği giderler ve geçmiş hekimler arası transferlerle bulunur; hedef tutara eşitlenmesi gereken net ödemeler önerilir.
+- Bölünemeyen kuruşlar hekimlerin kayıt sırasına göre 1 kuruşluk parçalar halinde dağıtılır. Negatif kalan da doğru hesaplanır.
+- PDF raporunda ödenek havuzu ve net hekim bakiyeleri (girişler tamamsa) yer alır.
+- **Erişim notu:** Halihazırda ortak ASM defterine erişen tüm yetkili editörler diğer hekimlerin ödeneklerini de değiştirebilir. Hekimlerin yalnızca kendi ödeneğine müdahale edebilmesi için hekim-kullanıcı eşleştirmesi ve sunucu tarafında yetki politikası eklenmelidir.

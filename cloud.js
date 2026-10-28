@@ -15,7 +15,7 @@ window.ASMCloud = (() => {
   }
   const changed=()=>listener();
   const message = error => error?.message || 'Bilinmeyen bir hata oluştu';
-  const empty = () => ({doctors:[],expenses:[],transfers:[]});
+  const empty = () => ({doctors:[],expenses:[],transfers:[],allowances:[]});
 
   async function loadSDK() {
     if(window.supabase?.createClient) return;

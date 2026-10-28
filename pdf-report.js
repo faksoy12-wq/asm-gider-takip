@@ -105,6 +105,39 @@ window.ASMPDF=(()=>{
         paddingTop:()=>0,paddingBottom:()=>0
       },margin:[0,0,0,17]}
     ];
+    const pool=report.allowancePool;
+    if(pool?.active){
+      const poolItems=[
+        {text:'Aylık Ödenek Havuzu',fontSize:13,bold:true,color:'#203b4b',margin:[0,2,0,8]},
+        {table:{widths:['*','*'],body:[
+          [{text:'TOPLAM ÖDENEK',style:'summaryLabel'},{text:'TOPLAM GİDER',style:'summaryLabel'}],
+          [{text:formatMoney(pool.totalAllowance),bold:true,fontSize:12,color:'#116a64',margin:[0,4,0,8]},
+           {text:formatMoney(pool.totalExpenses),bold:true,fontSize:12,color:'#116a64',margin:[0,4,0,8]}],
+          [{text:pool.complete?'TOPLAM KALAN':'ÖDENEK DURUMU',style:'summaryLabel'},
+           {text:pool.complete?'HEKİM BAŞINA YAKLAŞIK':'KAYDI TAMAMLANAN',style:'summaryLabel'}],
+          [{text:pool.complete?formatMoney(pool.remainder):'Kayıt bekleniyor',bold:true,fontSize:12,color:'#116a64',margin:[0,4,0,8]},
+           {text:pool.complete?formatMoney(pool.baseShare):pool.recordedCount+' / '+pool.doctorCount,bold:true,fontSize:12,color:'#116a64',margin:[0,4,0,8]}]
+        ]},layout:'noBorders',margin:[0,0,0,10]}
+      ];
+      if(pool.complete){
+        poolItems.push(
+          {text:'Hekimlerin Ödenek Dengesi',fontSize:11,bold:true,color:'#203b4b',margin:[0,5,0,7]},
+          {table:{headerRows:1,widths:['*',87,87,87],body:[
+            ['HEKİM','YATAN','ÖDEDİĞİ','NET BAKİYE'].map(text=>({text,style:'tableHead'})),
+            ...pool.perDoctor.map(p=>[
+              {text:p.name,fontSize:8,margin:[5,6,4,6]},
+              {text:formatMoney(p.allowance),fontSize:8,alignment:'right',margin:[3,6,4,6]},
+              {text:formatMoney(p.spent),fontSize:8,alignment:'right',margin:[3,6,4,6]},
+              {text:formatMoney(p.balance),fontSize:8,alignment:'right',bold:true,margin:[3,6,4,6]}
+            ])
+          ]},layout:'lightHorizontalLines',margin:[0,0,0,10]},
+          {text:'Pozitif net bakiye alacak, negatif bakiye borçtur. Geçmiş transferler hesaba dahildir.',fontSize:8,color:'#7d8f99',margin:[0,0,0,12]}
+        );
+      }else{
+        poolItems.push({text:'Ödenek girişi beklenen hekimler: '+pool.missing.map(d=>d.name).join(', ')+'. Net hesaplaşma henüz oluşturulmadı.',fontSize:9,color:'#925c0b',margin:[0,0,0,12]});
+      }
+      content.splice(3,0,...poolItems);
+    }
     if(categories.length){
       content.push(
         {text:'Kategori Özeti',fontSize:12,bold:true,color:'#203b4b',margin:[0,4,0,7]},
@@ -145,8 +178,8 @@ window.ASMPDF=(()=>{
     setTimeout(()=>URL.revokeObjectURL(url),60000);
   }
   async function share(report){
-    if(!report||!Array.isArray(report.expenses)||!report.expenses.length){
-      throw new Error('Bu ay için gider kaydı bulunmuyor.');
+    if(!report||!Array.isArray(report.expenses)||(!report.expenses.length&&!report.allowancePool?.active)){
+      throw new Error('Bu ay için gider veya ödenek kaydı bulunmuyor.');
     }
     const pdfMake=await preload();
     const documentDefinition=reportDefinition(report);
