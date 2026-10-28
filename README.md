@@ -1,33 +1,67 @@
-# ASM Gider Takip (PWA)
+# ASM Gider Takip — Mobil uyumlu PWA (v2)
 
-Aile Sağlığı Merkezi hekimleri için harcama, gider paylaşımı ve ay sonu hesaplaşma uygulaması.
+Aile Sağlığı Merkezleri için hekim giderlerini, paylaşım yüzdelerini, kişi bazında net alacak/borcu ve transferleri takip eden mobil uyumlu uygulama.
 
-## Vercel ile yayınlama
+**Canlı pilot:** https://asm-gider-takip.vercel.app  
+**GitHub:** https://github.com/faksoy12-wq/asm-gider-takip
 
-1. Vercel kontrol panelinde **Add New → Project** seçin.
-2. GitHub deposu **faksoy12-wq/asm-gider-takip** için **Import** seçin.
-3. Framework Preset: **Other**; Root Directory: `./`. Build Command / Output Directory alanlarını boş (varsayılan) bırakın.
-4. **Deploy** seçin. Vercel HTTPS adresi açıldığında sayfa görüntülenir.
-5. Android Chrome'da **Uygulamayı yükle**, iPhone Safari'de **Paylaş → Ana Ekrana Ekle** seçeneklerini kullanın.
+## V2 ile gelenler
 
-## İlk sürümün özellikleri
+- 320–1024 piksel arasında uyumlu kart, form, ödeme ve hesaplaşma satırları; taşma ve sağa-sola kayma düzeltmeleri
+- Eşit / yüzdesel paylaşım, kuruş bazında yuvarlama, ay sonu net borç/alacak ve transfer listesi
+- Yerel cihaz sürümü için JSON yedek, içe aktarma ve CSV dışa aktarma
+- Supabase bağlantısına hazır oturum açma ve kayıt ekranları
+- ASM oluşturma, yönetici tarafından doğrulanmış hesabı ASM'ye ekleme/çıkarma
+- Ekip üyelerinin paylaştığı **tek** bulut defteri; PostgreSQL row-level security (RLS)
+- İki hekimin aynı anda düzenlemesinde yanlışlıkla son yazanın diğerinin değişikliğini ezmesini engelleyen revizyon kontrolü
+- İsteğe bağlı olarak eski yerel kayıtları **boş** bulut defterine, açık onayla aktarabilme
 
-- Hekim ekleme; daha önce işlem görmüş hekimin yanlışlıkla silinmesini engelleme
-- Gider kaydetme, düzenleme, silme; tutarları kuruş bazında işleme
-- Eşit veya yüzdesel bölüşüm (kuruş farkları için dengeli dağıtım)
-- Seçilen ayın net alacak/borç bakiyesi ve önerilen transferler
-- Gerçekleşmiş transferi “ödendi” işaretleme ve yanlış kaydı geri alma
-- JSON yedek alma / yükleme, CSV gider dışa aktarımı
-- Telefonda ana ekrana eklenebilen PWA; daha önce açılmış dosyaları çevrimdışı kullanabilme
+## Vercel
 
-## Önemli sınırlamalar
+Vercel bu depoya GitHub'dan bağlıdır. `main` dalına gönderilen değişiklikler otomatik yayınlanır. Statik HTML/CSS/JS kullanılır; npm kurulumu gerekmez. `api/public-config.js` ise Vercel Function'dır ve yalnızca herkese açık Supabase istemci yapılandırmasını verir.
 
-**Bu sürüm bir pilot / kişisel test sürümüdür.** Veriler yalnızca o cihazın o tarayıcısındaki `localStorage` alanında tutulur. Birden fazla hekim arasında senkronizasyon, kullanıcı girişleri, sunucu veritabanı ve otomatik yedek henüz yoktur. Aynı URL farklı telefonlarda aynı verileri göstermez. Tarayıcı verileri silinirse yedeksiz kayıtlar kaybolabilir.
+## Bulut ve giriş sistemini etkinleştirme
 
-GitHub deposunun görünürlüğü **Public** olduğunda kaynak kod herkes tarafından görülebilir. Bu kodda kullanıcı parolası veya gizli anahtar bulunmaz; buraya gizli anahtar ya da gerçek mali kayıt eklemeyin. **Hasta adı, TC kimlik numarası, sağlık bilgisi veya diğer hassas verileri bu sürüme girmeyin.** Gerçek ekip kullanımı için kimlik doğrulama, yetki kontrolü, sunucu yedeği ve Supabase gibi merkezi bir veritabanı planlanmalıdır.
+Bu depodaki Supabase altyapı kodu hazırdır; **tek başına GitHub'a kod yüklemek veritabanı oluşturmaz.** Gerçek çok kullanıcılı mod için:
 
-“Ödendi” yalnızca bir kayıt oluşturur, gerçek banka havalesi gerçekleştirmez. Gider düzenlenirse o aya ait önceki ödeme kayıtlarını yeniden kontrol edin. Borçlar aylar arasında otomatik devredilmez. Fatura fotoğrafı ekleme henüz yoktur.
+1. [Supabase Dashboard](https://supabase.com/dashboard) içinde bir proje açın (veya mevcut projenizi seçin).
+2. **SQL Editor** → New query bölümünde [`supabase/migrations/202610280001_asm_team_ledger.sql`](supabase/migrations/202610280001_asm_team_ledger.sql) dosyasının tamamını **bir defa** çalıştırın. Bu işlem workspace, membership, ledger, RLS ve kontrollü yazma işlevlerini oluşturur.
+3. **Authentication → URL Configuration** bölümünde Site URL olarak `https://asm-gider-takip.vercel.app` tanımlayın. Redirect URL listesine bu adresi (gerekirse `https://asm-gider-takip.vercel.app/**` desenini) ekleyin. E-posta doğrulamasını açık tutun; gerekirse SMTP ayarlayın.
+4. Supabase projesinden **Project URL** ve **publishable key** (ya da legacy anon key) değerlerini bulun. **service_role / secret key kesinlikle kullanmayın.**
+5. Vercel → `asm-gider-takip` → **Settings → Environment Variables** ekranına şunları ekleyin:
 
-## Teknoloji
+   ```env
+   SUPABASE_URL=https://PROJE-REF.supabase.co
+   SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
+   ```
 
-Statik HTML/CSS/JavaScript + Service Worker + Web App Manifest. Derleme veya gizli ortam değişkeni gerektirmez.
+6. Vercel'de üretim ortamına yeni deployment oluşturun. Ardından uygulamayı açın, **Giriş yap → Yeni hesap oluştur** seçeneğinden kayıt olun, e-postanızı doğrulayın ve giriş yapın.
+7. İlk yönetici hesabıyla **Yeni ASM oluştur** seçeneğini kullanın. Diğer hekimler önce kendi hesaplarıyla kayıt olmalı, e-postalarını doğrulamalıdır. Yönetici, **Hesabım** ekranından bu adresleri ASM'ye ekler.
+8. Önce örnek/test giderleriyle farklı telefonlardan ortak görünüm ve hesaplaşmayı deneyin. Önceki yerel verileri taşımak isterseniz bulut ASM defteri boşken Hesabım ekranında taşıma seçeneği görünür. İşleme başlamadan JSON yedek alın.
+
+Supabase bağlantısı yapılandırılmamışken uygulama v1'deki gibi **yerel pilot** modunda açılır. Bağlantı etkin olduğunda hekimler giriş yapmadan ortak giderleri görüp düzenleyemez.
+
+## Veri modeli ve güvenlik
+
+- `asm_workspaces`: ASM çalışma alanı, oluşturma bilgisi.
+- `asm_members`: ASM yetkilileri (`owner`, `editor`) ve erişebildikleri alan.
+- `asm_ledgers`: ASM'ye ait JSON gider defteri, sürüm (`revision`) ve son düzenleyen.
+- `asm_create_workspace`, `asm_add_member_by_email`, `asm_remove_member`: yetki doğrulamalı yönetim işlevleri.
+- `asm_save_ledger`: atomik, sürüm kontrollü kayıt; diğer cihazdaki değişiklikleri otomatik ezmez.
+- RLS sadece üyelerin ilgili ASM'yi görmesini sağlar. Doğrudan tablo yazımı kapalıdır; sunucu kontrolünde RPC kullanılır.
+
+**Önemli:** Bu sürüm mali kayıt takibi içindir. Hasta bilgisi, TC kimlik numarası veya sağlık verisi saklamayın. Tüm üyeler (`owner`/`editor`) gider defterini düzenleyebilir; ayrıntılı denetim izi, her gider için yazma kısıtı, otomatik yedekleme, belge ekleme ve banka havalesi entegrasyonu bu sürümde yoktur. Çok kullanıcılı moda geçmeden önce SQL/RLS kurulumunu tamamlayın ve en az iki test hesabıyla erişim sınırlarını doğrulayın.
+
+### Yerel pilot modun sınırları
+
+Yerel modda kayıtlar tarayıcının `localStorage` alanındadır; ayrı telefonlar aynı kayıtları paylaşmaz. Tarayıcı verilerini silmek kayıtları silebilir. Yedek alın. Bulut modu ise Supabase projesi kurulmadan çalışmaz.
+
+## Hızlı geliştirme ve test
+
+```bash
+node --check app.js
+node --check cloud.js
+node --test tests/ledger.test.cjs
+```
+
+Bu testler hesaplama ve sözdizimini doğrular; gerçek Supabase uygulaması / API bağlantısı ayrıca test edilmelidir.
