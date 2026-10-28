@@ -7,6 +7,7 @@
 window.ASMPDF=(()=>{
   const PDFMAKE_CDN='https://cdn.jsdelivr.net/npm/pdfmake@0.2.20/build/';
   let pending;
+  let fontsLoaded=false;
   function addScript(url){
     return new Promise((resolve,reject)=>{
       const script=document.createElement('script');
@@ -21,10 +22,13 @@ window.ASMPDF=(()=>{
     if(!pending){
       pending=(async()=>{
         if(!window.pdfMake?.createPdf)await addScript(PDFMAKE_CDN+'pdfmake.min.js');
-        if(!window.pdfMake?.vfs?.['Roboto-Regular.ttf'])await addScript(PDFMAKE_CDN+'vfs_fonts.js');
-        if(!window.pdfMake?.createPdf||!window.pdfMake?.vfs?.['Roboto-Regular.ttf']){
-          throw new Error('PDF yazı tipleri yüklenemedi.');
+        if(!fontsLoaded){
+          await addScript(PDFMAKE_CDN+'vfs_fonts.js');
+          // Modern pdfmake installs fonts in its internal virtual filesystem.
+          // pdfMake.vfs is not a reliable public property in all 0.2.x builds.
+          fontsLoaded=true;
         }
+        if(!window.pdfMake?.createPdf)throw new Error('PDF kütüphanesi başlatılamadı.');
         return window.pdfMake;
       })().catch(error=>{pending=null;throw error;});
     }
