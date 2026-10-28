@@ -72,3 +72,7 @@ ASM Gider Takip'in ana ekran simgesi, stetoskop ve hekimlik asası ile yükselen
 iOS için `apple-touch-icon.png`, Android için PWA manifestindeki 192/512 piksel ve maskable simge kullanılır.
 Önceden ana ekrana eklenen simgeyi yenilemek için uygulamanın kısayolunu kaldırıp uygulamayı tekrar ana ekrana ekleyin.
 Bu işlem Supabase'de saklanan kayıtları silmez; yine de önemli veriler için yedek önerilir.
+
+## Veri Yönetimi
+
+Hekimler ekranı yalnızca hekim kayıtlarını gösterir. İsteğe bağlı JSON yedek alma veya geri yükleme işlemleri **Hesabım → Veri Yönetimi** altındaki açılır alana taşınmıştır. Bulut kayıtları yedekten bağımsız olarak uygulama üzerinden kaydedilir; yükleme mevcut defteri değiştirmeden önce onay ister.

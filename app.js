@@ -109,9 +109,26 @@ function doctorsPage(){
     <div class="toolbar"><button type="submit">+ Hekim ekle</button></div></form></section>
     <section class="card"><h2>Kayıtlı hekimler (${db.doctors.length})</h2>
     ${db.doctors.map(d=>`<div class="item money-row"><strong class="item-main">${esc(d.name)}</strong><button class="danger" data-del-doctor="${esc(d.id)}">Sil</button></div>`).join('')||'<div class="empty">Önce hekim ekleyin.</div>'}</section>
-    <section class="card"><h2>Yedekleme</h2><p class="muted">JSON yedeğini indirip arşivleyin. İçe aktarım mevcut defteri tamamen değiştirir.</p>
-    <div class="toolbar"><button type="button" id="export">JSON yedek indir</button>
-    <label class="backup-control">JSON yedek yükle<input id="import" type="file" accept=".json,application/json"></label></div></section>`;
+`;
+}
+function dataManagement(){
+  const remote=hasRemote();
+  return `<section class="card data-management">
+    <details id="data-management">
+      <summary class="data-management__summary">
+        <span class="data-management__label"><strong>Veri Yönetimi</strong><small>Yedekleme ve geri yükleme</small></span>
+        <span class="data-management__chevron" aria-hidden="true"></span>
+      </summary>
+      <div class="data-management__content">
+        <p class="muted">${remote?'Giderleriniz ortak ASM veritabanına kaydedilir. JSON yedeği isteğe bağlı ek bir kopyadır.':'Bu cihazdaki kayıtlar otomatik olarak bu cihazda saklanır. JSON yedeği ayrı bir kopya oluşturur.'}</p>
+        <div class="toolbar">
+          <button id="export" type="button">JSON yedeğini indir</button>
+          <label class="backup-control">JSON yedeği yükle<input id="import" type="file" accept=".json,application/json"></label>
+        </div>
+        <p class="fine">Yedek yüklemek mevcut defteri değiştirir; işlem öncesinde onay istenir.</p>
+      </div>
+    </details>
+  </section>`;
 }
 function settlement(){
   const b=balances(),pending=transfers(),history=db.transfers.filter(t=>t.month===month),sum=selectedMonth().reduce((n,e)=>n+e.amount,0);
@@ -134,7 +151,7 @@ function accountPage(){
     <section class="card"><h2>Ortak veri sistemi henüz etkinleştirilmedi</h2>
     <p class="muted">Şu anda giderler sadece bu cihazda saklanıyor. Supabase projesi oluşturup SQL kurulumunu yaptıktan sonra Vercel'de <code>SUPABASE_URL</code> ve <code>SUPABASE_PUBLISHABLE_KEY</code> değişkenlerini ekleyerek çok kullanıcılı modu açabiliriz.</p>
     <div class="warning">Gerçek gider kayıtlarını bulut güvenlik yapılandırması tamamlanmadan burada saklamayın.</div>
-    <div class="toolbar"><button id="export">Mevcut verilerin yedeğini indir</button><button class="secondary" data-go="home">Yerel moda dön</button></div></section>`;
+    <div class="toolbar"><button class="secondary" data-go="home">Yerel moda dön</button></div></section>`+dataManagement();
   if(s.error&&!s.user)return `<div class="auth-layout"><section class="card"><h1>Bağlantı hatası</h1><p class="warning">${esc(s.error)}</p><button id="retry-cloud" class="wide">Yeniden dene</button></section></div>`;
   if(!s.user)return `<div class="auth-layout"><section class="card"><div class="breadcrumb">GÜVENLİ GİRİŞ</div><h1>ASM hesabına giriş</h1>
     <p class="muted">Hekimlerin aynı kayıtları görmesi için hesaplarına giriş yapması gerekir.</p>
@@ -161,7 +178,7 @@ function accountPage(){
     <form id="add-member"><label>Hekimin kayıtlı e-postası</label><input name="email" type="email" autocomplete="off" placeholder="hekim@ornek.com" required><div class="toolbar"><button type="submit">Hesaba ASM erişimi ver</button></div></form></section>
     <section class="card"><h2>Yetkili kullanıcılar</h2>
     ${(s.members||[]).map(member=>`<div class="item member-grid"><div class="member-name"><strong>${esc(member.email)}</strong><small>${member.role==='owner'?'Yönetici':'Hekim / editör'}</small></div>${member.role==='owner'?'':`<button class="danger" data-remove-member="${esc(member.user_id)}">Kaldır</button>`}</div>`).join('')||'<p class="muted">Üyeleri yüklemek için Hesabım ekranını yeniden açın.</p>'}</section>`:''}
-    <section class="card"><h2>Yedekleme</h2><div class="toolbar"><button id="export">Ortak defterin JSON yedeğini indir</button><label class="backup-control">JSON yedek yükle<input id="import" type="file" accept=".json,application/json"></label></div></section>`;
+    ${dataManagement()}`;
 }
 
 function launchScreen(){
