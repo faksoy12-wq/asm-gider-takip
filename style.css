@@ -391,3 +391,30 @@ input:focus, select:focus, textarea:focus { border-color: #29968b; }
   overflow-wrap: anywhere;
 }
 .auth-feedback[hidden] { display: none; }
+
+/* v13: mobile-friendly month switcher and transparent carried allowances */
+.month-switcher {
+  display: flex;
+  flex: 0 1 auto;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.month-switcher .select-month {
+  flex: 0 1 185px;
+  width: 185px;
+  min-width: 0;
+}
+.month-switcher #current-month {
+  flex: 0 0 auto;
+  padding: 10px 12px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.allowance-row__person small {line-height: 1.45;}
+@media(max-width:530px) {
+  .month-switcher {width:100%; justify-content:flex-start;}
+  .month-switcher .select-month {width:auto; flex:1 1 160px;}
+}

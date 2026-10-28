@@ -94,3 +94,12 @@ Hekimler ekranı yalnızca hekim kayıtlarını gösterir. İsteğe bağlı JSON
 - Gider veya ödenek düzenleme formu açıksa otomatik istek başlatılmaz; kullanıcı girdilerinin kaybolması önlenir. Beklenmeyen eş zamanlı değişiklik durumunda eski formu açık bırakarak üzerine yazmak yerine güncel kayıt gösterilir.
 - Ortak defter PostgreSQL revizyon kontrolüyle korunur. Kaydetme başlamadan önceki revizyon ile yazma yapılır; başka cihazın değişikliğinin üzerine sessizce yazılmaz.
 - Bu özellik **anlık gerçek zamanlı dinleme** değildir: giriş, sayfa/uygulama dönüşü ve sekme geçişinde yenilenir. Ayrı cihazlardaki kayıtlar güncel görünsün diye aynı hesabın şifresini paylaşmak güvenlik açısından önerilmez.
+
+## v13 — Takvim senkronizasyonu ve otomatik ödenek aktarımı
+
+- Güncel ay uygulama ilk açıldığında cihazın **yerel tarihine** göre seçilir. Kullanıcı ayı özellikle değiştirmediyse, uygulama açık kaldığında bile ay/yıl geçişi takip edilir (uygulamaya geri dönüş ve dakikalık kontrol). Özet, Giderler, Hekimler ve Hesaplaşma ortak seçili aya bağlıdır.
+- **Yeni gider** tarihi içinde bulunduğumuz ayda otomatik olarak **bugün** seçilir. Eski bir ay özellikle seçilmişse giderin yanlışlıkla bu aya kaydedilmemesi için yeni gider formu seçili ayın ilk günüyle açılır. Kullanıcı tarihi değiştirebilir; kaydedince giderin ait olduğu aya geçilir. Önceden kayıtlı giderleri düzenlerken orijinal tarih korunur.
+- Hekimler için bir ay girilen ödenek tutarı, sonradan değiştirilmedikçe izleyen aylara **varsayılan** olarak taşınır; kullanıcı yalnızca değişen hekim için yeni tutar kaydeder. 0 TL geçerli değer olmaya devam eder. Kayıt yapılmamış yeni bir hekim için önceki aydan aktarım yapılamaz.
+- Otomatik tutarlar Hekimler ekranında ve PDF'de açıkça işaretlenir: Bunlar yeni aya ait banka hareketleri doğrulanmadan **varsayım** niteliğindedir.
+- Yeni ay için ilk ödenek/gider/transfer kaydı yapılırken otomatik tutarlar o ayın defterine kopyalanır (copiedFrom alanıyla), böylece geçmiş aylara sonradan yapılan tutar düzeltmeleri daha önce işlem yapılmış yeni ayları sessizce değiştirmez.
+- Eski aylardaki kayıtlar ve hesaplaşmalar korunur. Kullanıcının elle seçtiği eski ay, isteği dışında güncel aya çevrilmez; **Bu ay** düğmesiyle güncel aya dönülebilir.

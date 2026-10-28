@@ -2,17 +2,33 @@
 const KEY='asm-gider-v1';
 const $=selector=>document.querySelector(selector);
 const uid=()=>globalThis.crypto?.randomUUID?.()||String(Date.now())+Math.random();
-const today=()=>new Date().toLocaleDateString('sv-SE');
+// Use the device's LOCAL calendar day, not a UTC date that may roll over early.
+const localDate=(date=new Date())=>[date.getFullYear(),String(date.getMonth()+1).padStart(2,'0'),String(date.getDate()).padStart(2,'0')].join('-');
+const today=()=>localDate();
 const monthNow=()=>today().slice(0,7);
 const money=cents=>(Number(cents||0)/100).toLocaleString('tr-TR',{style:'currency',currency:'TRY'});
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const cats=['Elektrik','Su','Doğalgaz','Temizlik','Personel maaşı','Sarf malzemesi','Kira','İnternet / Telefon','Bakım / Onarım','Diğer'];
 const empty=()=>({doctors:[],expenses:[],transfers:[],allowances:[]});
 let db=load(), page='home', month=monthNow(), deferredInstall=null, busy=false, notification='';
+let monthManuallySelected=false;
 let autoRefreshAt=0, autoRefreshPending=false;
 const cloud=window.ASMCloud;
 const state=()=>cloud.status();
 const poolStatus=()=>window.ASMAllowanceMath.analyze(db,month);
+const dateForNewExpense=()=>month===monthNow()?today():month+'-01';
+function snapshotAllowancesForMonth(entryMonth){
+  db.allowances ||= [];
+  db.allowances.push(...window.ASMAllowanceMath.snapshotInherited(db,entryMonth));
+}
+function syncMonthWithCalendar(aboutToNavigate=false){
+  // Keep a past month intentionally selected by the user. Otherwise follow
+  // the real calendar, including when the app remains open over midnight.
+  if(monthManuallySelected||month===monthNow())return false;
+  if(!aboutToNavigate&&editingFormOpen())return false;
+  month=monthNow();
+  return true;
+}
 
 function load(){
   try {const value=JSON.parse(localStorage.getItem(KEY));validateBackup(value);return value}
@@ -85,7 +101,12 @@ function transfers(){
   return out;
 }
 function doctor(id){return db.doctors.find(d=>d.id===id)?.name||'Silinmiş hekim'}
-function monthControl(){return `<input class="select-month" aria-label="Ay seçin" type="month" id="month" value="${month}">`}
+function monthControl(){
+  return `<div class="month-switcher">
+    <input class="select-month" aria-label="Ay seçin" type="month" id="month" value="${month}">
+    ${month!==monthNow()?'<button type="button" id="current-month" class="secondary">Bu ay</button>':''}
+  </div>`;
+}
 function heading(title,subtitle,withMonth=false){return `<div class="page-heading"><div><h1>${title}</h1><p class="muted">${subtitle}</p></div>${withMonth?monthControl():''}</div>`}
 function balanceRow(label,value){const color=value>0?'green':value<0?'red':'';return `<div class="item money-row"><span class="item-main">${esc(label)}</span><strong class="amount ${color}">${value>0?'+':''}${money(value)}</strong></div>`}
 function expenseRow(e){return `<article class="item item--action"><div class="money-row"><div class="item-main"><strong>${esc(e.category)}</strong><small>${esc(e.date)} · Ödeyen: ${esc(doctor(e.paidBy))}</small></div><strong class="amount">${money(e.amount)}</strong></div><p class="muted">${esc(e.description||'Açıklama yok')} · ${e.participants.length} hekim</p><div class="actions"><button type="button" class="secondary" data-edit="${esc(e.id)}">Düzenle</button><button type="button" class="danger" data-del="${esc(e.id)}">Sil</button></div></article>`}
@@ -101,6 +122,7 @@ function home(){
     </section>
     ${pool.active?`<section class="card"><span class="muted">Toplam kalan</span>
       ${pool.complete?`<div class="metric teal">${money(pool.remainder)}</div><p class="fine">Hekim başına yaklaşık ${money(pool.baseShare)}. Kuruş farkları tam olarak dağıtılır.</p>`:`<p class="warning">Ödenek kaydı bekleyenler: ${pool.missing.map(d=>esc(d.name)).join(', ')}</p>`}
+      ${pool.inheritedCount?'<p class="fine">Not: '+pool.inheritedCount+' hekimin tutarı önceki aydan otomatik taşındı. Yeni ayın gerçek ödeneği farklıysa güncelleyin.</p>':''}
       <button class="secondary" data-go="doctors">${pool.complete?'Ödenekleri görüntüle':'Ödenekleri tamamla'}</button>
     </section>`:''}
     <section class="card"><div class="row"><h2>Son giderler</h2><button class="secondary" data-go="expenses">Tümü</button></div>
@@ -119,34 +141,42 @@ function expenses(){
 function allowanceSection(){
   const pool=poolStatus();
   return `<section class="card">
-    <div class="row wrap"><h2>Bu ay yatan ödenekler</h2><span class="tag">${pool.recordedCount} / ${pool.doctorCount} kayıt</span></div>
-    <p class="muted">Her hekim adına yatan ödeneği girin. 0 TL ödenek için de sıfır tutarlı kayıt oluşturun. Kalan para bütün hekimlerin kayıtları tamamlanınca eşitlenir. Bu sürümde ASM yetkilileri tüm hekimlerin tutarlarını düzenleyebilir.</p>
+    <div class="row wrap"><h2>Bu ay yatan ödenekler</h2>
+      <span class="tag">${pool.recordedCount} / ${pool.doctorCount} tutar</span></div>
+    <p class="muted">Bir hekimin ödeneğini bir kez kaydetmeniz yeterli. Yeni aylarda önceki ayın tutarı otomatik önerilir; sadece değişiklik varsa güncelleyin. 0 TL de geçerli bir tutardır.</p>
+    ${pool.inheritedCount?`<p class="info">${pool.inheritedCount} hekimin ödeneği önceki aydan otomatik getirildi. Bunlar varsayılan tutarlardır; gerçek ödenek farklı yatarsa ilgili hekimi güncelleyin.</p>`:''}
     ${db.doctors.map(d=>{
-      const record=(db.allowances||[]).find(a=>a.doctorId===d.id&&a.month===month);
+      const item=pool.perDoctor.find(p=>p.id===d.id);
+      const filled=item?.allowance!==null&&item?.allowance!==undefined;
       return `<div class="allowance-row"><div class="allowance-row__person">
-        <strong>${esc(d.name)}</strong><small>${record?'Ödenek kaydedildi':'Ödenek bekleniyor'}</small></div>
-        <div class="allowance-row__amount"><strong class="${record?'teal':'muted'}">${record?money(record.amount):'—'}</strong>
-        <button type="button" class="secondary" data-allowance="${esc(d.id)}">${record?'Düzenle':'Ödenek gir'}</button></div></div>`;
+        <strong>${esc(d.name)}</strong>
+        <small>${item?.inherited?'Önceki aydan otomatik · '+esc(item.sourceMonth):filled?'Bu ay güncellendi':'Ödenek bekleniyor'}</small></div>
+        <div class="allowance-row__amount"><strong class="${filled?'teal':'muted'}">${filled?money(item.allowance):'—'}</strong>
+        <button type="button" class="secondary" data-allowance="${esc(d.id)}">${filled?'Güncelle':'Ödenek gir'}</button></div></div>`;
     }).join('')||'<div class="empty">Ödenek girmek için önce hekim ekleyin.</div>'}
-    ${pool.active&&!pool.complete?`<p class="warning">Ödenek kaydı bekleyenler: ${pool.missing.map(d=>esc(d.name)).join(', ')}. Tümü girilmeden kesin hesaplaşma yapılmaz.</p>`:''}
-    ${pool.complete?`<p class="info">Toplam ödenek ${money(pool.totalAllowance)} · Toplam gider ${money(pool.totalExpenses)} · Kişi başına yaklaşık ${money(pool.baseShare)}</p>`:''}
+    ${pool.active&&!pool.complete?`<p class="warning">Ödenek kaydı beklenen hekimler: ${pool.missing.map(d=>esc(d.name)).join(', ')}. Bunları tamamlayınca hesaplaşma açılır.</p>`:''}
+    ${pool.complete?`<p class="fine">Toplam ödenek: ${money(pool.totalAllowance)} · Toplam gider: ${money(pool.totalExpenses)} · Hekim başına kalan: ${money(pool.baseShare)}</p>`:''}
+    <p class="fine">Hekim tutarları ortak ASM defterini düzenleme yetkisi olan kullanıcılar tarafından değiştirilebilir.</p>
     </section>`;
 }
 function allowanceForm(id){
   const person=db.doctors.find(d=>d.id===id);
   if(!person)return;
   const recordMonth=month;
+  const item=poolStatus().perDoctor.find(d=>d.id===id);
   const record=(db.allowances||[]).find(a=>a.doctorId===id&&a.month===recordMonth);
   page='doctors';
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.page==='doctors'));
   $('#app').innerHTML=heading('Aylık ödenek',person.name+' · '+recordMonth)+`
     <form id="allowance-form"><section class="card"><h2>Hesaba yatan tutar</h2>
-      <p class="muted">Bu hekimin ${esc(recordMonth)} ayında aldığı toplam ödeneği girin. 0 TL girilmesi de geçerli bir kayıttır.</p>
+      ${item?.inherited?`<p class="info">${esc(item.sourceMonth)} ayındaki tutar otomatik getirildi. Aynıysa hiçbir işlem yapmanıza gerek yok; farklıysa bu aya özel tutarı kaydedin.</p>`:
+        '<p class="muted">Bu ay bu hekimin hesabına yatan toplam ödeneği girin. Ödenek yatmadıysa 0 TL girebilirsiniz.</p>'}
       <label for="allowance-amount">Ödenek (₺)</label>
-      <input name="amount" id="allowance-amount" type="text" inputmode="decimal" required placeholder="40.000,00" value="${record?(record.amount/100).toFixed(2).replace('.',','):''}">
-      <div class="toolbar"><button type="submit">${record?'Ödeneği güncelle':'Ödeneği kaydet'}</button><button id="cancel-allowance" type="button" class="secondary">Vazgeç</button></div>
+      <input name="amount" id="allowance-amount" type="text" inputmode="decimal" required placeholder="40.000,00"
+        value="${item?.allowance!==null&&item?.allowance!==undefined?(item.allowance/100).toFixed(2).replace('.',','):''}">
+      <div class="toolbar"><button type="submit">${item?.allowance===null?'Ödeneği kaydet':'Bu ay için güncelle'}</button><button id="cancel-allowance" type="button" class="secondary">Vazgeç</button></div>
     </section></form>
-    ${record?'<section class="card"><button id="remove-allowance" class="danger" type="button">Bu ayın ödenek kaydını kaldır</button></section>':''}`;
+    ${record?`<section class="card"><button id="remove-allowance" class="danger" type="button">${window.ASMAllowanceMath.effectiveAllowances({...db,allowances:db.allowances.filter(a=>a!==record)},recordMonth).find(d=>d.id===id)?.allowance!=null?'Bu ayki kaydı kaldır, önceki tutara dön':'Bu ayın ödenek kaydını kaldır'}</button></section>`:''}`;
   $('#cancel-allowance').onclick=()=>navigate('doctors');
   $('#allowance-form').onsubmit=event=>saveAllowance(event,id,recordMonth);
   $('#remove-allowance')?.addEventListener('click',()=>removeAllowance(id,recordMonth));
@@ -156,6 +186,7 @@ async function saveAllowance(event,id,recordMonth){
   const amount=parseAmount(event.target.elements.amount.value);
   if(!Number.isSafeInteger(amount)||amount<0){alert('Ödenek sıfır veya daha büyük olmalı. En fazla iki ondalık basamak kullanın.');return;}
   await mutate(()=>{
+    snapshotAllowancesForMonth(recordMonth);
     db.allowances=db.allowances.filter(a=>a.doctorId!==id||a.month!==recordMonth);
     db.allowances.push({doctorId:id,month:recordMonth,amount});
   },()=>navigate('doctors'));
@@ -218,6 +249,7 @@ function allowanceSettlement(){
       <div class="card"><span class="muted">Toplam ödenek</span><div class="metric">${money(pool.totalAllowance)}</div><span class="fine">${pool.recordedCount} / ${pool.doctorCount} hekim kaydetti</span></div>
       <div class="card"><span class="muted">Toplam gider</span><div class="metric">${money(pool.totalExpenses)}</div><span class="fine">Ödeyen hekimden düşülür</span></div>
     </section>
+    ${pool.inheritedCount?`<p class="info">Bu ay ${pool.inheritedCount} hekimin ödeneği önceki aydan otomatik taşındı. Gerçek yatan tutarı kontrol edin; farklıysa Hekimler bölümünden güncelleyin.</p>`:''}
     ${pool.complete?`<section class="card"><span class="muted">Toplam kalan</span><div class="receipt-value teal">${money(pool.remainder)}</div>
       <hr class="divider"><span class="muted">Hekim başına eşit kalan</span><div class="receipt-value">${money(pool.baseShare)}</div>
       <p class="fine">Bölünemeyen kuruş farkları hekimlere sırasıyla dağıtılır. Negatif kalan, giderlerin toplam ödeneği aştığı anlamına gelir.</p></section>`
@@ -293,6 +325,7 @@ function launchScreen(){
   </div>`;
 }
 function render(){
+  syncMonthWithCalendar();
   const s=state();
   const booting=Boolean(s.loading||s.resolving);
   const forced=booting||(s.enabled&&(!s.user||!s.workspace||!s.ready))||Boolean(s.error&&!s.enabled);
@@ -311,7 +344,15 @@ function render(){
   const pages={home,expenses,doctors:doctorsPage,settlement,account:accountPage};
   const root=$('#app');root.innerHTML=(notification?`<p class="warning">${esc(notification)}</p>`:'')+(pages[view]||home)();
   notification='';
-  root.querySelector('#month')?.addEventListener('change',event=>{month=event.target.value||monthNow();render()});
+  root.querySelector('#month')?.addEventListener('change',event=>{
+    const selected=event.target.value;
+    month=/^\d{4}-(0[1-9]|1[0-2])$/.test(selected)?selected:monthNow();
+    monthManuallySelected=month!==monthNow();
+    render();
+  });
+  root.querySelector('#current-month')?.addEventListener('click',()=>{
+    month=monthNow();monthManuallySelected=false;render();
+  });
   root.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>navigate(b.dataset.go));
   root.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>expenseForm(b.dataset.edit));
   root.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>deleteExpense(b.dataset.del));
@@ -354,11 +395,13 @@ async function autoRefreshCloud(){
   }
 }
 function navigate(next){
+  syncMonthWithCalendar(true);
   page=next;render();
   if(next==='account'&&state().role==='owner')cloud.listMembers().catch(e=>{notification=e.message;render()});
   void autoRefreshCloud();
 }
 function expenseForm(id){
+  syncMonthWithCalendar(true);
   if(!db.doctors.length){alert('Önce en az bir hekim ekleyin.');navigate('doctors');return}
   const e=db.expenses.find(x=>x.id===id),participants=e?.participants||db.doctors.map(d=>d.id);
   page='expenses';document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.page==='expenses'));
@@ -366,7 +409,7 @@ function expenseForm(id){
     <form id="expense-form">
       <section class="card"><h2>01 — Gider bilgileri</h2><div class="form-grid"><div class="field"><label>Kategori *</label><select name="category">${cats.map(c=>`<option ${e?.category===c?'selected':''}>${esc(c)}</option>`).join('')}</select></div>
       <div class="field"><label>Tutar (₺) *</label><input name="amount" inputmode="decimal" type="text" required value="${e?(e.amount/100).toFixed(2).replace('.',','):''}" placeholder="8.400,00"></div>
-      <div class="field"><label>Harcama tarihi *</label><input type="date" name="date" required value="${e?.date||today()}"></div></div>
+      <div class="field"><label>Harcama tarihi *</label><input type="date" name="date" required value="${e?.date||dateForNewExpense()}"></div></div>
       <label>Açıklama</label><textarea name="description" rows="2" maxlength="500" placeholder="Örn. Ekim ayı elektrik faturası">${esc(e?.description||'')}</textarea></section>
       <section class="card"><h2>02 — Ödeme bilgileri</h2><div class="form-grid"><div class="field"><label>Ödemeyi yapan hekim *</label><select name="paidBy">${db.doctors.map(d=>`<option value="${esc(d.id)}" ${e?.paidBy===d.id?'selected':''}>${esc(d.name)}</option>`).join('')}</select></div>
       <div class="field"><label>Ödeme yöntemi</label><select name="paymentMethod">${[['bank','Banka havalesi / EFT'],['cash','Nakit'],['card','Kart']].map(([v,n])=>`<option value="${v}" ${e?.paymentMethod===v?'selected':''}>${n}</option>`).join('')}</select></div></div></section>
@@ -407,6 +450,7 @@ function parseAmount(input){
 async function submitExpense(event,existing){
   event.preventDefault();
   const f=event.target,amount=parseAmount(f.elements.amount.value);
+  const expenseMonth=f.elements.date.value.slice(0,7);
   const pooled=poolStatus().active;
   const ids=pooled?(existing?.participants||db.doctors.map(d=>d.id)):[...document.querySelectorAll('[data-participant]:checked')].map(el=>el.dataset.participant);
   const method=pooled?(existing?.method||'equal'):f.elements.method.value;
@@ -425,7 +469,15 @@ async function submitExpense(event,existing){
   const obj={id:existing?.id||uid(),category:f.elements.category.value,amount,date:f.elements.date.value,
     description:f.elements.description.value.trim(),paidBy:f.elements.paidBy.value,
     paymentMethod:f.elements.paymentMethod.value,method,participants:ids,percentages};
-  await mutate(()=>{if(existing)db.expenses=db.expenses.map(x=>x.id===existing.id?obj:x);else db.expenses.push(obj)},()=>navigate('expenses'));
+  await mutate(()=>{
+    snapshotAllowancesForMonth(expenseMonth);
+    if(existing)db.expenses=db.expenses.map(x=>x.id===existing.id?obj:x);
+    else db.expenses.push(obj);
+  },()=>{
+    month=expenseMonth;
+    monthManuallySelected=month!==monthNow();
+    navigate('expenses');
+  });
 }
 async function addDoctor(event){
   event.preventDefault();const name=event.target.elements.name.value.trim();if(!name)return;
@@ -438,13 +490,23 @@ async function deleteDoctor(id){
   }
   if(confirm(`${doctor(id)} silinsin mi?`))await mutate(()=>{db.doctors=db.doctors.filter(d=>d.id!==id)});
 }
-async function deleteExpense(id){if(confirm('Bu gider silinsin mi?'))await mutate(()=>{db.expenses=db.expenses.filter(e=>e.id!==id)})}
+async function deleteExpense(id){
+  if(!confirm('Bu gider silinsin mi?'))return;
+  const existing=db.expenses.find(e=>e.id===id);
+  await mutate(()=>{
+    if(existing)snapshotAllowancesForMonth(existing.date.slice(0,7));
+    db.expenses=db.expenses.filter(e=>e.id!==id);
+  });
+}
 async function recordTransfer(index){
   const pool=poolStatus();
   if(pool.active&&!pool.complete){alert('Önce tüm hekimlerin ödeneklerini girin.');return;}
   const t=transfers()[index];if(!t)return;
   if(confirm(`${doctor(t.from)} → ${doctor(t.to)}: ${money(t.amount)} ödendi olarak kaydedilsin mi?`))
-    await mutate(()=>db.transfers.push({...t,id:uid(),month,date:today()}));
+    await mutate(()=>{
+      snapshotAllowancesForMonth(month);
+      db.transfers.push({...t,id:uid(),month,date:today()});
+    });
 }
 async function undoTransfer(id){if(confirm('Bu ödeme kaydı geri alınsın mı?'))await mutate(()=>{db.transfers=db.transfers.filter(t=>t.id!==id)})}
 function download(name,content,type){
@@ -602,12 +664,20 @@ async function signOut(){if(!ensureEditable())return;busy=true;
 $('#account').onclick=()=>navigate('account');
 document.querySelectorAll('nav button').forEach(button=>button.onclick=()=>navigate(button.dataset.page));
 window.addEventListener('beforeinstallprompt',event=>{event.preventDefault();deferredInstall=event;$('#install').hidden=false});
-window.addEventListener('pageshow',()=>{void autoRefreshCloud()});
-window.addEventListener('focus',()=>{void autoRefreshCloud()});
-window.addEventListener('online',()=>{void autoRefreshCloud()});
+function onCalendarReturn(){
+  if(syncMonthWithCalendar())render();
+  void autoRefreshCloud();
+}
+window.addEventListener('pageshow',onCalendarReturn);
+window.addEventListener('focus',onCalendarReturn);
+window.addEventListener('online',onCalendarReturn);
 document.addEventListener('visibilitychange',()=>{
-  if(document.visibilityState==='visible')void autoRefreshCloud();
+  if(document.visibilityState==='visible')onCalendarReturn();
 });
+// Rollover during a continuously open app, at most one check per minute.
+setInterval(()=>{
+  if(document.visibilityState==='visible'&&syncMonthWithCalendar())render();
+},60000);
 $('#install').onclick=async()=>{if(deferredInstall){deferredInstall.prompt();await deferredInstall.userChoice;deferredInstall=null;$('#install').hidden=true}};
 if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js').catch(()=>{});
 cloud.init(remote=>{

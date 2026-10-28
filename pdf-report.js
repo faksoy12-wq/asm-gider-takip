@@ -119,6 +119,12 @@ window.ASMPDF=(()=>{
            {text:pool.complete?formatMoney(pool.baseShare):pool.recordedCount+' / '+pool.doctorCount,bold:true,fontSize:12,color:'#116a64',margin:[0,4,0,8]}]
         ]},layout:'noBorders',margin:[0,0,0,10]}
       ];
+      if(pool.inheritedCount){
+        poolItems.push({
+          text:'Önemli: '+pool.inheritedCount+' hekimin ödeneği, önceki aylardaki son kayıtlı tutarına göre otomatik getirildi. Bu tutarlar yeni ay için ayrıca doğrulanmadıysa varsayım niteliğindedir.',
+          fontSize:8,color:'#a26813',margin:[0,0,0,11]
+        });
+      }
       if(pool.complete){
         poolItems.push(
           {text:'Hekimlerin Ödenek Dengesi',fontSize:11,bold:true,color:'#203b4b',margin:[0,5,0,7]},
