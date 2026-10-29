@@ -13,7 +13,31 @@ const empty=()=>({doctors:[],expenses:[],transfers:[],allowances:[]});
 let db=load(), page='home', month=monthNow(), deferredInstall=null, busy=false, notification='';
 let monthManuallySelected=false;
 const authUI={mode:'login',email:'',message:null,completedSignup:false};
-let autoRefreshAt=0, autoRefreshPending=false;
+const INVITE_PENDING_KEY='asm-pending-invite-v1';
+let pendingInvite='',joinError='',createdInvite=null,invitePrompted=false;
+function parseInviteCode(input){
+  const text=String(input||'').trim();
+  if(/^[a-f0-9]{32}$/i.test(text))return text.toLowerCase();
+  const match=text.match(/(?:^|[#?&])davet=([a-f0-9]{32})(?:$|[&#])/i);
+  return match?match[1].toLowerCase():null;
+}
+function captureInvitation(){
+  let code=null;
+  try{
+    code=parseInviteCode(location.hash);
+    if(code) {
+      localStorage.setItem(INVITE_PENDING_KEY,code);
+      window.history?.replaceState?.(null,'',location.pathname+location.search);
+    }else code=parseInviteCode(localStorage.getItem(INVITE_PENDING_KEY));
+  }catch{/* Local storage can be disabled, but the pasted code still works. */}
+  pendingInvite=code||'';
+}
+function clearInvitation(){
+  pendingInvite='';joinError='';
+  try{localStorage.removeItem(INVITE_PENDING_KEY)}catch{}
+}
+captureInvitation();
+let autoRefreshAt=0, autoRefreshPending=false,workspaceTransition=false;
 const cloud=window.ASMCloud;
 const state=()=>cloud.status();
 const DEVICE_DOCTOR_PREFIX='asm-device-doctor-v1';
@@ -178,7 +202,7 @@ function home(){
   const selected=selectedMonth(),sum=selected.reduce((n,e)=>n+e.amount,0),pool=poolStatus();
   const b=pool.active&&!pool.complete?{}:balances();
   const balancesShort=Object.entries(b).filter(([,value])=>value!==0).slice(0,6);
-  return heading('Genel Bakış','Aylık giderler ve güncel bakiyeler',true)+`
+  return heading('Genel Bakış',esc(state().workspace?.name||'ASM')+' · Aylık giderler ve güncel bakiyeler',true)+`
     <section class="grid" aria-label="Özet göstergeleri">
       <div class="card"><span class="muted">${pool.active?'Toplam ödenek':'Toplam gider'}</span><div class="metric">${money(pool.active?pool.totalAllowance:sum)}</div><span class="fine">${pool.active?pool.recordedCount+' / '+pool.doctorCount+' ödenek girildi':selected.length+' harcama'}</span></div>
       <div class="card"><span class="muted">${pool.active?'Toplam gider':'Hekim başına ortalama'}</span><div class="metric">${money(pool.active?pool.totalExpenses:(periodDoctors().length?Math.round(sum/periodDoctors().length):0))}</div><span class="fine">${pool.active?selected.length+' harcama':periodDoctors().length+' hekim · yalnızca ortalama'}</span></div>
@@ -350,6 +374,93 @@ function allowanceSettlement(){
     </section>`;
 }
 
+
+function joinWorkspaceSection(newAccount=false){
+  return `<section class="card join-workspace-card">
+    <div class="join-card-heading">
+      <span class="join-step">${newAccount?'1 · ÖNERİLEN':'YENİ BİR ASM'}</span>
+      <h2>${newAccount?'Bir ASM’ye katıl':'Başka bir ASM’ye katıl'}</h2>
+      <p class="muted">ASM yöneticisinin WhatsApp veya başka bir yolla gönderdiği davet bağlantısını açabilir ya da davet kodunu buraya yapıştırabilirsiniz.</p>
+    </div>
+    ${pendingInvite?`<div class="join-detected">
+      <span>Davet bağlantınız algılandı. Katılmak için aşağıdaki butona basın.</span>
+      <button type="button" id="clear-pending-invite" class="secondary">Kodu temizle</button>
+    </div>`:''}
+    <form id="join-invite-form">
+      <label for="join-invite-code">Davet kodu veya bağlantısı</label>
+      <input id="join-invite-code" name="invite" type="text" spellcheck="false" autocomplete="off" autocapitalize="none"
+        placeholder="Yöneticinizin paylaştığı bağlantıyı yapıştırın" value="${esc(pendingInvite)}" required>
+      <button type="submit" class="wide join-main-action">Davetle ASM’ye katıl</button>
+    </form>
+    ${joinError?`<p class="warning" role="alert">${esc(joinError)}</p>`:''}
+    <p class="fine">Davetiniz henüz yok mu? ASM yöneticinizden kendi e-posta adresinize özel davet bağlantısı isteyin. Yeni bir ASM açmanıza gerek yok.</p>
+    <div class="join-existing-member">
+      <span>Yönetici sizi e-postanızla doğrudan eklediyse</span>
+      <button class="secondary" id="check-memberships" type="button">Üyeliklerimi kontrol et</button>
+    </div>
+  </section>`;
+}
+function newWorkspaceSection(){
+  return `<section class="card create-workspace-card">
+    <details>
+      <summary>Yeni bir ASM kurmak istiyorum</summary>
+      <div class="create-workspace-body">
+        <p class="muted">Yalnızca kendi ASM’nizin giderlerini ilk kez yönetecekseniz bu seçeneği kullanın. Bir ASM’ye davet edildiyseniz yukarıdaki alandan katılın.</p>
+        <form id="new-workspace">
+          <label for="workspace-name">ASM adı</label>
+          <input id="workspace-name" name="name" minlength="2" maxlength="100" required placeholder="Örn. Merkez ASM">
+          <button type="submit" class="wide">Yeni ASM oluştur</button>
+        </form>
+      </div>
+    </details>
+  </section>`;
+}
+function workspaceSwitcherSection(s){
+  const all=s.workspaces||[];
+  return `<section class="card workspace-switcher">
+    <div class="row wrap"><h2>ASM’lerim</h2><span class="tag">${all.length} ASM</span></div>
+    <p class="muted">Hesabınızla birden fazla ASM’de çalışabilirsiniz. Her ASM’nin giderleri birbirinden ayrıdır.</p>
+    ${all.map(w=>`<div class="workspace-choice ${w.id===s.workspace?.id?'is-current':''}">
+      <div class="workspace-choice__details"><strong>${esc(w.name)}</strong>
+        <small>${w.role==='owner'?'Yönetici':'Hekim / editör'}</small></div>
+      ${w.id===s.workspace?.id?'<span class="workspace-current">Şu an açık</span>':
+        `<button type="button" class="secondary" data-switch-workspace="${esc(w.id)}">Bu ASM’ye geç</button>`}
+    </div>`).join('')}
+  </section>`;
+}
+function ownerInvitationSection(s){
+  const issued=createdInvite?.workspaceId===s.workspace.id?createdInvite:null;
+  return `<section class="card invite-owner">
+    <h2>Hekim davet et</h2>
+    <p class="muted">Hekimin e-posta adresini yazın, davet bağlantısı oluşturun ve WhatsApp üzerinden gönderin. Hekim henüz hesap açmamış olsa da bağlantıyı paylaşabilirsiniz.</p>
+    <form id="create-invite-form">
+      <label for="invite-email">Davet edilecek hekimin e-postası</label>
+      <input id="invite-email" name="email" type="email" autocomplete="off" required maxlength="254"
+        placeholder="hekim@ornek.com">
+      <button class="wide" type="submit">Davet bağlantısı oluştur</button>
+    </form>
+    ${issued?`<div class="invite-created" role="status">
+      <strong>Davet bağlantısı hazır</strong>
+      <p class="muted">${esc(issued.email)} için oluşturuldu. 14 gün geçerlidir ve bir kez kullanılabilir.</p>
+      <label for="invite-created-link">Paylaşılacak bağlantı</label>
+      <input id="invite-created-link" readonly type="text" value="${esc(issued.link)}">
+      <button class="secondary wide" type="button" id="copy-invite">Bağlantıyı kopyala</button>
+      <p class="fine" id="invite-copy-status" aria-live="polite">Davet edilen hekim bağlantıyı açıp kendi hesabıyla giriş yaparak katılabilir.</p>
+    </div>`:''}
+    <details class="member-legacy-invite">
+      <summary>Hesabı olan hekimi doğrudan ekle</summary>
+      <div class="create-workspace-body">
+        <p class="fine">Hekimin doğrulanmış hesabı varsa, bağlantı göndermeden erişim verebilirsiniz.</p>
+        <form id="add-member">
+          <label for="direct-member-email">Kayıtlı e-posta adresi</label>
+          <input id="direct-member-email" name="email" type="email" autocomplete="off" required placeholder="hekim@ornek.com">
+          <button class="secondary wide" type="submit">Hekime ASM erişimi ver</button>
+        </form>
+      </div>
+    </details>
+  </section>`;
+}
+
 function accountPage(){
   const s=state();
   if(s.loading||s.resolving)return launchScreen();
@@ -364,7 +475,7 @@ function accountPage(){
     <div class="auth-intro">
       <span class="breadcrumb">GÜVENLİ ASM ERİŞİMİ</span>
       <h1>${authUI.mode==='login'?'Tekrar hoş geldiniz':'ASM Gider Takip’e katılın'}</h1>
-      <p class="muted">${authUI.mode==='login'?'Giderlerinizi ve ortak hesaplaşmaları görüntülemek için giriş yapın.':'Kişisel hesabınızı oluşturun. ASM yöneticisi sizi ortak çalışma alanına ekleyebilir.'}</p>
+      <p class="muted">${authUI.mode==='login'?'Giderlerinizi ve ortak hesaplaşmaları görüntülemek için giriş yapın.':'Kişisel hesabınızı oluşturun. Davet bağlantınızla kendi ASM’nize katılabilirsiniz.'}</p>
     </div>
     <div class="auth-mode-switch" role="group" aria-label="Hesap işlemi">
       <button id="auth-mode-login" type="button" aria-pressed="${authUI.mode==='login'}" aria-controls="login-form" class="auth-mode-button ${authUI.mode==='login'?'is-active':''}">Giriş yap</button>
@@ -398,15 +509,21 @@ function accountPage(){
     <div class="auth-bottom">
       ${authUI.mode==='login'?`<p>Henüz hesabınız yok mu? <button type="button" class="auth-link" id="auth-alt-signup">Hesap oluşturun</button></p>`:
         `<p>Zaten hesabınız var mı? <button type="button" class="auth-link" id="auth-alt-login">Giriş yapın</button></p>`}
-      <p class="form-note">${authUI.mode==='signup'?'Hesap oluşturduktan sonra e-posta doğrulaması gerekebilir. Ortak ASM verileri için yöneticinizin size erişim vermesi gerekir.':'ASM’ye davet edildiyseniz, davet edilen e-posta adresinizle giriş yapın.'}</p>
+      <p class="form-note">${authUI.mode==='signup'?'Hesap oluşturduktan sonra e-posta doğrulaması gerekebilir. Ardından yöneticinizin gönderdiği bağlantıyla ASM’ye katılabilirsiniz.':'ASM’ye davet edildiyseniz, davet edilen e-posta adresinizle giriş yapın.'}</p>
     </div>
   </section></div>`;
   if(s.error&&!s.ready)return `<div class="auth-layout"><section class="card"><h1>ASM bağlantısı tamamlanamadı</h1><p class="warning">${esc(s.error)}</p><button id="retry-cloud" class="wide">Yeniden dene</button></section></div>`;
-  if(!s.workspace)return `<div class="auth-layout"><section class="card"><div class="breadcrumb">HOŞ GELDİNİZ</div><h1>ASM çalışma alanı</h1>
-    <p class="muted">${esc(s.user.email)} hesabına giriş yapıldı. Henüz bu hesabın erişebildiği bir ASM bulunmuyor.</p>
-    <form id="new-workspace"><label>ASM adı</label><input name="name" minlength="2" maxlength="100" required placeholder="Örn. Merkez ASM"><div class="toolbar"><button type="submit">Yeni ASM oluştur</button></div></form>
-    <p class="form-note">Başka bir ASM'ye katılacaksanız önce o ASM'nin yöneticisi e-posta adresinizi eklemeli; sonra sayfayı yenileyin.</p>
-    <div class="toolbar"><button id="refresh-workspace" class="secondary">Üyelikleri yenile</button><button id="logout" class="secondary">Çıkış yap</button></div></section></div>`;
+  if(!s.workspace)return `<div class="join-onboarding">
+    <section class="card join-welcome">
+      <span class="breadcrumb">HESABINIZ HAZIR</span>
+      <h1>Hangi ASM’de çalışıyorsunuz?</h1>
+      <p class="muted"><strong>${esc(s.user.email)}</strong> hesabınızla giriş yaptınız. Henüz bir ASM’ye bağlı değilsiniz.</p>
+      <p>Size davet gönderildiyse <strong>yeni ASM oluşturmayın.</strong> Aşağıdan davetle katılın.</p>
+    </section>
+    ${joinWorkspaceSection(true)}
+    ${newWorkspaceSection()}
+    <p class="join-signout"><button type="button" id="logout" class="secondary">Başka hesapla giriş yap</button></p>
+  </div>`;
   if(!s.ready)return `<div class="loading-state">Ortak ASM defteri yükleniyor…</div>`;
   const local=load(),hasLocal=local.doctors.length||local.expenses.length||local.transfers.length;
   const remoteEmpty=!db.doctors.length&&!db.expenses.length&&!db.transfers.length;
@@ -415,11 +532,12 @@ function accountPage(){
     <div class="muted">${esc(s.user.email)} · ${s.role==='owner'?'Yönetici':'Hekim / editör'}</div></div>
     <span class="tag"><span class="cloud-dot cloud-dot--online"></span> Buluta bağlı</span></div>
     <div class="toolbar"><button id="refresh-workspace" class="secondary">Güncel kayıtları getir</button><button id="logout" class="secondary">Çıkış yap</button></div></section>
+    ${workspaceSwitcherSection(s)}
     ${deviceDoctorSection()}
+    ${joinWorkspaceSection()}
+    ${newWorkspaceSection()}
     ${remoteEmpty&&hasLocal?`<section class="card"><h2>Bu cihazdan veri taşıma</h2><p class="muted">Cihazda daha önce kaydettiğiniz pilot kayıtları bulut ASM defterine aktarabilirsiniz. Bu işlem boş bulut defterini doldurur.</p><button id="migrate-local" class="wide">Yerel kayıtları buluta aktar</button></section>`:''}
-    ${s.role==='owner'?`<section class="card"><h2>Hekim hesabı davet et</h2><p class="muted">Hekimin önce kendi e-postasıyla uygulamaya kayıt olup e-posta doğrulaması yapması gerekiyor. Sonra yöneticinin bu adresten üyelik vermesi yeterli.</p>
-    <form id="add-member"><label>Hekimin kayıtlı e-postası</label><input name="email" type="email" autocomplete="off" placeholder="hekim@ornek.com" required><div class="toolbar"><button type="submit">Hesaba ASM erişimi ver</button></div></form></section>
-    <section class="card"><h2>Yetkili kullanıcılar</h2>
+    ${s.role==='owner'?ownerInvitationSection(s)+`<section class="card"><h2>Yetkili kullanıcılar</h2>
     ${(s.members||[]).map(member=>`<div class="item member-grid"><div class="member-name"><strong>${esc(member.email)}</strong><small>${member.role==='owner'?'Yönetici':'Hekim / editör'}</small></div>${member.role==='owner'?'':`<button class="danger" data-remove-member="${esc(member.user_id)}">Kaldır</button>`}</div>`).join('')||'<p class="muted">Üyeleri yüklemek için Hesabım ekranını yeniden açın.</p>'}</section>`:''}
     ${dataManagement()}`;
 }
@@ -446,9 +564,9 @@ function render(){
   // The login screen already has a primary login action. Avoid a redundant
   // header button while the user is unauthenticated.
   $('#account').hidden=Boolean(s.enabled&&!s.user);
-  $('#account').textContent=booting?'Hazırlanıyor':s.enabled?(s.ready?'Hesabım':'Giriş yap'):'Bulut / Hesap';
+  $('#account').textContent=booting?'Hazırlanıyor':s.enabled?(s.user?'Hesabım':'Giriş yap'):'Bulut / Hesap';
   const online=Boolean(s.enabled&&s.ready&&s.workspace);
-  $('#cloud-status').innerHTML=`<span class="cloud-dot ${online&&!s.error?'cloud-dot--online':''}"></span>${booting?'Güvenli bağlantı hazırlanıyor':online?(s.error?'Ortak ASM · yenileme hatası':'Ortak ASM · güncel'):s.enabled?'Giriş gerekli':s.error?'Bağlantı hatası':'Yerel pilot'}`;
+  $('#cloud-status').innerHTML=`<span class="cloud-dot ${online&&!s.error?'cloud-dot--online':''}"></span>${booting?'Güvenli bağlantı hazırlanıyor':online?(s.error?'Ortak ASM · yenileme hatası':esc(s.workspace.name)+' · güncel'):s.enabled?(s.user?'ASM seçimi gerekiyor':'Giriş gerekli'):s.error?'Bağlantı hatası':'Yerel pilot'}`;
   if(booting){$('#app').innerHTML=launchScreen();return;}
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.page===view));
   const pages={home,expenses,doctors:doctorsPage,settlement,account:accountPage};
@@ -489,6 +607,15 @@ function render(){
   root.querySelectorAll('[data-auth-show]').forEach(button=>button.addEventListener('click',()=>toggleAuthPassword(button)));
   $('#auth-email')?.addEventListener('input',()=>{authUI.message=null;const feedback=$('#auth-feedback');if(feedback)feedback.hidden=true;});
   $('#new-workspace')?.addEventListener('submit',createWorkspace);
+  $('#join-invite-form')?.addEventListener('submit',joinViaInvite);
+  $('#clear-pending-invite')?.addEventListener('click',()=>{
+    clearInvitation();render();
+  });
+  $('#check-memberships')?.addEventListener('click',refreshCloud);
+  $('#create-invite-form')?.addEventListener('submit',createInviteLink);
+  $('#copy-invite')?.addEventListener('click',copyInviteLink);
+  root.querySelectorAll('[data-switch-workspace]').forEach(b=>
+    b.addEventListener('click',()=>switchActiveWorkspace(b.dataset.switchWorkspace)));
   $('#add-member')?.addEventListener('submit',addMember);
   $('#logout')?.addEventListener('click',signOut);
   $('#retry-cloud')?.addEventListener('click',()=>location.reload());
@@ -858,9 +985,84 @@ async function authSubmit(event){
   }
 }
 async function createWorkspace(event){
-  event.preventDefault();if(!ensureEditable())return;busy=true;
-  try {await cloud.createWorkspace(event.target.elements.name.value.trim());page='home';}
-  catch(e){alert('ASM oluşturulamadı: '+e.message)}finally{busy=false;render()}
+  event.preventDefault();
+  if(!ensureEditable())return;
+  const name=event.target.elements.name.value.trim();
+  if(!name)return;
+  busy=true;workspaceTransition=true;
+  try{
+    const response=await cloud.createWorkspace(name);
+    if(response?.ledger){validateBackup(response.ledger);db=response.ledger;}
+    createdInvite=null;joinError='';page='home';
+  }catch(error){
+    notification='Yeni ASM oluşturulamadı: '+(error?.message||'Bağlantı hatası');
+    page='account';
+  }finally{workspaceTransition=false;busy=false;render();}
+}
+async function switchActiveWorkspace(workspaceId){
+  if(!ensureEditable()||!workspaceId)return;
+  if(state().workspace?.id===workspaceId)return;
+  busy=true;workspaceTransition=true;
+  try{
+    const remote=await cloud.switchWorkspace(workspaceId);
+    if(remote){validateBackup(remote);db=remote;}
+    createdInvite=null;joinError='';page='home';
+  }catch(error){
+    notification='ASM değiştirilemedi: '+(error?.message||'Bağlantı hatası');
+    page='account';
+  }finally{workspaceTransition=false;busy=false;render();}
+}
+async function joinViaInvite(event){
+  event.preventDefault();
+  if(!ensureEditable())return;
+  const code=parseInviteCode(event.target.elements.invite.value);
+  if(!code){
+    joinError='Geçerli bir davet kodu veya yöneticinizin gönderdiği bağlantıyı girin.';
+    render();return;
+  }
+  pendingInvite=code;
+  try{localStorage.setItem(INVITE_PENDING_KEY,code)}catch{}
+  busy=true;workspaceTransition=true;
+  try{
+    const result=await cloud.acceptInvite(code);
+    if(result?.ledger){validateBackup(result.ledger);db=result.ledger;}
+    clearInvitation();
+    createdInvite=null;page='home';
+  }catch(error){
+    joinError=error?.message||'Davet kabul edilemedi. Davet edilen hesabınızla giriş yaptığınızı kontrol edin.';
+    page='account';
+  }finally{workspaceTransition=false;busy=false;render();}
+}
+async function createInviteLink(event){
+  event.preventDefault();
+  if(!ensureEditable())return;
+  const email=event.target.elements.email.value.trim().toLowerCase();
+  busy=true;
+  try{
+    const code=await cloud.createInvite(email);
+    if(!/^[a-f0-9]{32}$/i.test(String(code)))throw new Error('Davet kodu oluşturulamadı.');
+    const url=location.origin+location.pathname+'#davet='+code;
+    createdInvite={workspaceId:state().workspace.id,email,link:url};
+    notification='Davet bağlantısı oluşturuldu. Bağlantıyı kopyalayıp hekime gönderin.';
+  }catch(error){
+    notification='Davet oluşturulamadı: '+(error?.message||'Bağlantı hatası');
+  }finally{busy=false;render();}
+}
+async function copyInviteLink(){
+  if(!createdInvite||createdInvite.workspaceId!==state().workspace?.id)return;
+  const field=$('#invite-created-link'),status=$('#invite-copy-status');
+  try{
+    if(navigator.clipboard?.writeText)await navigator.clipboard.writeText(createdInvite.link);
+    else{
+      if(!field)throw new Error('Kopyalanacak bağlantı bulunamadı');
+      field.select();field.setSelectionRange?.(0,field.value.length);
+      if(!document.execCommand?.('copy'))throw new Error('Kopyalama desteği bulunamadı');
+    }
+    if(status)status.textContent='Bağlantı kopyalandı. WhatsApp üzerinden hekime gönderebilirsiniz.';
+  }catch{
+    if(status)status.textContent='Otomatik kopyalanamadı. Yukarıdaki bağlantıyı seçip kopyalayabilirsiniz.';
+    field?.focus();field?.select();
+  }
 }
 async function addMember(event){
   event.preventDefault();if(!ensureEditable())return;busy=true;
@@ -903,6 +1105,14 @@ function onCalendarReturn(){
   void autoRefreshCloud();
 }
 window.addEventListener('pageshow',onCalendarReturn);
+window.addEventListener('hashchange',()=>{
+  if(!/^#davet=/i.test(location.hash||''))return;
+  captureInvitation();
+  joinError='';
+  invitePrompted=true;
+  if(state().user)page='account';
+  render();
+});
 window.addEventListener('focus',onCalendarReturn);
 window.addEventListener('online',onCalendarReturn);
 document.addEventListener('visibilitychange',()=>{
@@ -925,10 +1135,15 @@ cloud.init(remote=>{
         db=remote;
       }else{
         // Never overwrite an in-flight local edit with a simultaneous fetch.
-        notification='Ortak kayıtlar yenilendi. Kaydetme işleminin ardından güncel verileri yeniden kontrol edin.';
+        if(!workspaceTransition)
+          notification='Ortak kayıtlar yenilendi. Kaydetme işleminin ardından güncel verileri yeniden kontrol edin.';
         return;
       }
     }catch(e){notification='Buluttaki kayıtlar doğrulanamadı: '+e.message;}
+  }
+  if(pendingInvite&&!invitePrompted&&state().user&&state().workspace&&!busy){
+    invitePrompted=true;
+    page='account';
   }
   if(!editingFormOpen()||remote||state().loading||state().resolving)render();
 });

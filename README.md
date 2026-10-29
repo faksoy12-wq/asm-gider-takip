@@ -127,3 +127,13 @@ Hekimler ekranı yalnızca hekim kayıtlarını gösterir. İsteğe bağlı JSON
 - Gönderim sırasında işlem butonu ve diğer akışa geçiş devre dışı kalır, işlem metni ve dönen gösterge görünür. Supabase hata metinleri teknik ham mesaj yerine giriş formunun altında Türkçe ve erişilebilir olarak açıklanır.
 - E-posta kotası aşıldığında açık hata verilir. Başarılı hesap oluşturma isteğinde oturum açılmamışsa ayrı bir **kayıt isteği alındı** adımı gösterilir; doğrulama e-postasının mutlaka teslim edildiği iddia edilmez. Aynı kayıt isteğinin tekrar tekrar gönderilmesini önlemek için form bu adımda gizlenir ve kullanıcı tek düğmeyle girişe dönebilir.
 - Mevcut Supabase e-posta/şifre kimlik doğrulama, ASM davet ve üyelik yetkileri değişmez; Google ile giriş veya yeni e-posta gönderim altyapısı eklenmemiştir.
+
+## v18 — Bir hesap, birden fazla ASM; kolay ve güvenli davet
+
+- Bir kullanıcı aynı doğrulanmış Supabase hesabıyla **birden fazla ASM** üyesi olabilir. Hesabım → ASM'lerim içinde yetkili olduğu ASM'leri görür; **Bu ASM'ye geç** düğmesiyle çalışma alanını değiştirir. Eski ASM hesabı ve kayıtlar korunur. Tercih cihazda ve kullanıcıya özel tutulur.
+- Henüz hiçbir ASM'ye üye olmayan kişinin ilk ekranında **Davetle ASM'ye katıl** birincil seçenektir. **Yeni ASM kurmak istiyorum** bölümü kapalıdır; yanlışlıkla fazladan ASM açılması önlenir.
+- ASM yöneticisi, davet edeceği hekimin e-posta adresini yazar ve 14 gün geçerli, tek kullanımlık bağlantı oluşturur. Linki WhatsApp ile iletir. **Hekim hesabının önceden oluşturulmuş olması gerekmez.** Hekim e-postasını doğrulayıp giriş yaptıktan sonra davet bağlantısıyla katılır. Doğrulanmış kayıtlı kullanıcılar için eski doğrudan e-postayla ekleme yöntemi ayrı bölümde kalır.
+- Davet bağlantısı URL fragmenti içindedir (#davet=...) ve ilk açılışta cihazda saklanır. Doğrulama sonrası yeni oturumda **Davetle ASM'ye katıl** alanına otomatik yerleşir. Davet doğrulandığında yerel geçici anahtar temizlenir.
+- Davet kaydında 128 bit rastgele tokenın **SHA256 özeti** tutulur. Kayıtlı e-postadan başka hesap kullanamaz, 14 gün sonunda geçersizdir, yalnızca bir kez kullanılabilir. Davet tablosuna anon veya authenticated kullanıcısının doğrudan okuma/yazma yetkisi yoktur.
+- Bir ASM'den diğerine geçildiğinde, kayıtlar ve **hekim cihaz tercihi** yeni ASM defterinden yüklenir. Eski ASM'nin giderleri yeni ASM'de görünmez. Yöneticinin ve hekimin mevcut yetkileri değişmez.
+- Davet sistemi, Supabase'in hesap doğrulama için kullandığı e-posta gönderim sınırını kaldırmaz; yalnızca ASM katılımı için uygulama e-postası gönderme zorunluluğu yoktur.
