@@ -137,3 +137,9 @@ Hekimler ekranı yalnızca hekim kayıtlarını gösterir. İsteğe bağlı JSON
 - Davet kaydında 128 bit rastgele tokenın **SHA256 özeti** tutulur. Kayıtlı e-postadan başka hesap kullanamaz, 14 gün sonunda geçersizdir, yalnızca bir kez kullanılabilir. Davet tablosuna anon veya authenticated kullanıcısının doğrudan okuma/yazma yetkisi yoktur.
 - Bir ASM'den diğerine geçildiğinde, kayıtlar ve **hekim cihaz tercihi** yeni ASM defterinden yüklenir. Eski ASM'nin giderleri yeni ASM'de görünmez. Yöneticinin ve hekimin mevcut yetkileri değişmez.
 - Davet sistemi, Supabase'in hesap doğrulama için kullandığı e-posta gönderim sınırını kaldırmaz; yalnızca ASM katılımı için uygulama e-postası gönderme zorunluluğu yoktur.
+
+## v19 — Girişte ve davet/üyelik sonrasında otomatik kayıt yükleme
+
+- Giriş/ilk kayıt/ASM davetini kabul etme anında buluttan gelen kayıtlar otomatik ekrana yansır. Önceki `busy` denetimi giriş işlemlerini yanlışlıkla finansal kayıt yazma işlemi gibi değerlendirerek veriyi göstermiyordu. Yeni `ledgerWriteInProgress` yalnızca gerçek finansal kayıt yazımını korur.
+- ASM'ye henüz bağlı olmayan ve oturumu açık hesaplarda sayfaya/uygulamaya dönüşte ve uygulama açıkken 30 saniyede bir üyelik kontrol edilir. Yönetici doğrudan erişim verdiğinde yeni ASM ve kayıtları ekstra butona basmadan açılır.
+- Düğme isteğe bağlı kalır. Açık düzenleme formları otomatik yenileme tarafından kesilmez. Bulut ve SQL şemaları değiştirilmedi.

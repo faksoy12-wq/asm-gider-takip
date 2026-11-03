@@ -37,7 +37,7 @@ function clearInvitation(){
   try{localStorage.removeItem(INVITE_PENDING_KEY)}catch{}
 }
 captureInvitation();
-let autoRefreshAt=0, autoRefreshPending=false,workspaceTransition=false;
+let autoRefreshAt=0, autoRefreshPending=false,workspaceTransition=false,ledgerWriteInProgress=false;
 const cloud=window.ASMCloud;
 const state=()=>cloud.status();
 const DEVICE_DOCTOR_PREFIX='asm-device-doctor-v1';
@@ -129,6 +129,7 @@ async function mutate(fn,callback){
   const previous=JSON.parse(JSON.stringify(db));
   const expectedRevision=state().revision;
   busy=true;
+  ledgerWriteInProgress=true;
   try {
     fn();validateBackup(db);
     if(hasRemote())await cloud.saveLedger(db,expectedRevision);
@@ -142,7 +143,10 @@ async function mutate(fn,callback){
       catch(e){notification='Güncel bulut kaydı alınamadı: '+e.message}
     }
     render();
-  }finally {busy=false;}
+  }finally {
+    ledgerWriteInProgress=false;
+    busy=false;
+  }
 }
 function selectedMonth(){return db.expenses.filter(x=>x.date.slice(0,7)===month)}
 function split(expense){
@@ -395,8 +399,8 @@ function joinWorkspaceSection(newAccount=false){
     ${joinError?`<p class="warning" role="alert">${esc(joinError)}</p>`:''}
     <p class="fine">Davetiniz henüz yok mu? ASM yöneticinizden kendi e-posta adresinize özel davet bağlantısı isteyin. Yeni bir ASM açmanıza gerek yok.</p>
     <div class="join-existing-member">
-      <span>Yönetici sizi e-postanızla doğrudan eklediyse</span>
-      <button class="secondary" id="check-memberships" type="button">Üyeliklerimi kontrol et</button>
+      <span>Yönetici sizi e-postanızla doğrudan eklediğinde ASM'niz burada otomatik açılır.</span>
+      <button class="secondary" id="check-memberships" type="button">Şimdi kontrol et</button>
     </div>
   </section>`;
 }
@@ -626,9 +630,10 @@ function editingFormOpen(){
   return Boolean(document.querySelector('#expense-form, #allowance-form'));
 }
 async function autoRefreshCloud(){
-  // Startup restoration fetches the current ledger. Re-check on navigation
-  // and foreground return, but do not interrupt active editing forms.
-  if(!hasRemote()||busy||autoRefreshPending||editingFormOpen())return;
+  // Check membership even before the doctor belongs to any ASM. Once the
+  // manager adds the member, a fresh ledger must appear without manual refresh.
+  const s=state();
+  if(!s.enabled||!s.user||s.loading||s.resolving||busy||autoRefreshPending||editingFormOpen())return;
   if(Date.now()-autoRefreshAt<5000)return;
   autoRefreshAt=Date.now();
   autoRefreshPending=true;
@@ -1122,19 +1127,29 @@ document.addEventListener('visibilitychange',()=>{
 setInterval(()=>{
   if(document.visibilityState==='visible'&&syncMonthWithCalendar())render();
 },60000);
+// Only check pending membership periodically. Once joined, normal refreshes
+// on opening the application / navigating are sufficient.
+setInterval(()=>{
+  const s=state();
+  if(document.visibilityState==='visible'&&s.enabled&&s.user&&!s.workspace&&!s.loading&&!s.resolving){
+    void autoRefreshCloud();
+  }
+},30000);
 $('#install').onclick=async()=>{if(deferredInstall){deferredInstall.prompt();await deferredInstall.userChoice;deferredInstall=null;$('#install').hidden=true}};
 if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js').catch(()=>{});
 cloud.init(remote=>{
   if(remote){
     try{
       validateBackup(remote);
-      if(!busy){
+      if(!ledgerWriteInProgress){
+        // Logging in, accepting an invite and checking memberships run while
+        // busy=true; none of those operations should discard the cloud ledger.
         if(editingFormOpen()){
           notification='Ortak kayıtlar başka bir cihazda değişti. Güncel haliyle devam etmek için açık form kapatıldı.';
         }
         db=remote;
       }else{
-        // Never overwrite an in-flight local edit with a simultaneous fetch.
+        // Only a real local ledger save can postpone replacing the data.
         if(!workspaceTransition)
           notification='Ortak kayıtlar yenilendi. Kaydetme işleminin ardından güncel verileri yeniden kontrol edin.';
         return;
