@@ -51,9 +51,31 @@
       </div>
     </footer>
   </div>
-  <script src="./cloud.js?v=21" defer></script>
+  <script>
+  /* Small, dependency-free recovery message for slow or failed mobile start-up. */
+  (function () {
+    function offerRecovery() {
+      var root=document.getElementById('app');
+      if (!root || !document.body.classList.contains('app-booting')) return;
+      if (!root.querySelector('.launch-screen')) return;
+      var note=document.createElement('div');
+      note.setAttribute('role','status');
+      note.style.cssText='max-width:400px;margin:0 auto 20px;padding:14px;border-radius:12px;background:#fff8e9;color:#543e20;text-align:left;font:13px/1.6 system-ui,-apple-system,sans-serif;border:1px solid #ecd7a7';
+      note.innerHTML='<strong>Açılış beklenenden uzun sürdü.</strong><p style="margin:6px 0">Telefonunuz bazı bağlantı veya uygulama dosyalarına erişemiyor olabilir.</p><a href="./baglanti-testi.html" style="font-weight:bold;color:#116a64">Bağlantıyı test et</a> &nbsp;·&nbsp; <a href="./?yeniden=1" style="color:#116a64">Tekrar dene</a>';
+      root.appendChild(note);
+    }
+    // Do not wait for load/DOMContentLoaded: blocked defer scripts delay both.
+    setTimeout(offerRecovery,15000);
+    window.addEventListener('error',function(e){
+      if (e && e.target && e.target.tagName==='SCRIPT') {
+        setTimeout(offerRecovery,250);
+      }
+    },true);
+  })();
+  </script>
+  <script src="./cloud.js?v=22" defer></script>
   <script src="./allowance-math.js?v=14" defer></script>
   <script src="./pdf-report.js?v=13" defer></script>
-  <script src="./app.js?v=19" defer></script>
+  <script src="./app.js?v=22" defer></script>
 </body>
 </html>

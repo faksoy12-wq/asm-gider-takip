@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#116a64">
+<title>ASM Gider Takip | Bağlantı Testi</title>
+<style>
+:root{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#243d4d;background:#eef4f5}
+*{box-sizing:border-box}
+body{max-width:620px;margin:0 auto;padding:24px 15px 40px}
+main{background:#fff;border-radius:16px;padding:22px 20px;box-shadow:0 7px 25px rgba(20,70,75,.07)}
+h1{font-size:22px;margin:0 0 8px}p{line-height:1.6;font-size:14px;color:#607481}
+ul{list-style:none;padding:0;margin:18px 0}
+li{padding:13px 0;border-top:1px solid #e8edef;font-size:14px;display:flex;gap:12px;justify-content:space-between;align-items:center}
+li strong{font-size:12px;max-width:45%;text-align:right;overflow-wrap:anywhere}
+.wait{color:#617481}.ok{color:#168052}.bad{color:#bb3c38}
+a{color:#126a64;font-weight:650}button{background:#136e66;color:#fff;border:0;border-radius:9px;padding:11px 15px;font-weight:700}
+small{display:block;color:#73848f;line-height:1.55;margin-top:20px}
+</style>
+</head>
+<body>
+<main>
+<h1>ASM Gider Takip · Bağlantı Testi</h1>
+<p>Bu sayfa açıldıysa telefonunuz Cloudflare adresine en azından bu sayfa için erişebiliyor. Aşağıdaki testler uygulama dosyalarını ve hizmet bağlantılarını kontrol eder; giriş yapmanız gerekmez.</p>
+<ul>
+<li><span>Uygulama JavaScript dosyası</span><strong id="app" class="wait">Kontrol ediliyor…</strong></li>
+<li><span>Supabase bağlantı dosyası</span><strong id="cloud" class="wait">Kontrol ediliyor…</strong></li>
+<li><span>Uygulama yapılandırması</span><strong id="config" class="wait">Kontrol ediliyor…</strong></li>
+<li><span>Supabase sunucu erişimi</span><strong id="supabase" class="wait">Kontrol ediliyor…</strong></li>
+<li><span>Giriş kütüphanesi (CDN)</span><strong id="cdn" class="wait">Kontrol ediliyor…</strong></li>
+</ul>
+<button type="button" id="retry">Testi yeniden çalıştır</button>
+<p><a href="./">ASM Gider Takip'e geri dön</a></p>
+<small>Bu test kimlik bilgilerinizi, e-posta adresinizi veya gider kayıtlarınızı okumaz. Test sonucu uygulama kullanıcısı adına hiçbir işlem yapmaz.</small>
+</main>
+<script>
+(function(){
+  function status(id,text,ok){
+    var e=document.getElementById(id); e.textContent=text;e.className=ok===null?'wait':(ok?'ok':'bad');
+  }
+  function check(id,url,opaque){
+    status(id,'Kontrol ediliyor…',null);
+    var controller=window.AbortController?new AbortController():null;
+    var timeout=setTimeout(function(){if(controller)controller.abort();},9000);
+    var init=opaque?{mode:'no-cors',cache:'no-store'}:{cache:'no-store'};
+    if(controller)init.signal=controller.signal;
+    fetch(url,init).then(function(response){
+      clearTimeout(timeout);
+      if(opaque||response.ok)status(id,'Erişilebilir',true);
+      else status(id,'HTTP '+response.status,false);
+    }).catch(function(){
+      clearTimeout(timeout);
+      status(id,'Bağlantı kurulamadı',false);
+    });
+  }
+  function run(){
+    var origin=location.origin;
+    check('app','./app.js?v=19');
+    check('cloud','./cloud.js?v=22');
+    check('config','./public-config.json');
+    check('supabase','https://ptdfeuczmqhvmdopvhro.supabase.co/auth/v1/health',true);
+    check('cdn','https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',true);
+  }
+  document.getElementById('retry').onclick=run;
+  run();
+})();
+</script>
+</body></html>

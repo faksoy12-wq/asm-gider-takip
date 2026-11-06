@@ -168,3 +168,9 @@ Cloudflare'ın yeni kurulum akışı otomatik olarak **Workers Builds** açtı; 
 - Cloudflare Workers → Domains & Routes altında gerçekten yayımlanan **tam** `workers.dev` URL bulunmalı. Adresi varsaymayın.
 - Supabase Authentication Redirect URLs listesine mevcut Worker URL'si eklenmelidir. Aynı Supabase hesabıyla tekrar giriş gerekir; browser login state farklı origin'ler arasında paylaşılmaz.
 - Yayımlanan alternatif adresin iş yerindeki Wi-Fi ve farklı mobil ağlarda açılacağı garanti edilemez; gerçek ağlarda test edin.
+
+## v22 — Mobil beyaz ekran teşhisi
+
+- `/baglanti-testi.html` herhangi bir giriş istemeyen, bağımsız HTML sayfasıdır. HTML kendisi açılamıyorsa mobil ağın Cloudflare Workers `workers.dev` alanına erişiminde sorun vardır. Sayfa açılıyorsa uygulama, Supabase yapılandırması ve üçüncü taraf istemci kütüphanesi ayrı ayrı test edilebilir.
+- Uygulamanın açılış animasyonu 15 saniyeden uzun sürerse basit ve erişilebilir bir yönlendirme gösterilir. Böylece uygulama hazır değilken boş veya sonsuz yükleme ekranında kalmak yerine test sayfasına gidilebilir.
+- Bu test kullanıcı verilerini görüntülemez veya sunucuya kayıt yazmaz. Eski veritabanı, giriş, ASM davet ve gider işlemleri değiştirilmez.

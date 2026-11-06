@@ -9,6 +9,7 @@ const root = path.resolve(__dirname, '..');
 const output = path.join(root, 'dist');
 const assets = [
   'index.html',
+  'baglanti-testi.html',
   'style.css',
   'app.js',
   'cloud.js',
