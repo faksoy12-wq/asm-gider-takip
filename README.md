@@ -174,3 +174,13 @@ Cloudflare'ın yeni kurulum akışı otomatik olarak **Workers Builds** açtı; 
 - `/baglanti-testi.html` herhangi bir giriş istemeyen, bağımsız HTML sayfasıdır. HTML kendisi açılamıyorsa mobil ağın Cloudflare Workers `workers.dev` alanına erişiminde sorun vardır. Sayfa açılıyorsa uygulama, Supabase yapılandırması ve üçüncü taraf istemci kütüphanesi ayrı ayrı test edilebilir.
 - Uygulamanın açılış animasyonu 15 saniyeden uzun sürerse basit ve erişilebilir bir yönlendirme gösterilir. Böylece uygulama hazır değilken boş veya sonsuz yükleme ekranında kalmak yerine test sayfasına gidilebilir.
 - Bu test kullanıcı verilerini görüntülemez veya sunucuya kayıt yazmaz. Eski veritabanı, giriş, ASM davet ve gider işlemleri değiştirilmez.
+
+## v23 — Tek bağlantı için GitHub Pages akıllı giriş
+
+- Kaynak: `docs/index.html`. GitHub Pages yayımlama kaynağı `main` dalındaki `/docs` klasörü olmalıdır.
+- GitHub → Settings → Pages → Build and deployment → Source: Deploy from a branch → Branch: `main` → Folder: `/docs` → Save.
+- Etkinleştirilip yayımlandıktan sonra beklenen paylaşım adresi: `https://faksoy12-wq.github.io/asm-gider-takip/`. **Açıldığını kontrol etmeden bu adresi dağıtmayın.**
+- Basit `Image` probe üzerinden mevcut Vercel ve Cloudflare Workers bağlantılarına ayrı ayrı, cache-busting favicon isteği gönderilir. Test CORS gerektirmez. Vercel ulaşılabiliyorsa onu, Vercel yanıt vermeyip Cloudflare erişilebiliyorsa Cloudflare'ı seçer. Her iki adres için manuel giriş her zaman sunulur.
+- Tarayıcının adresi hiç açamadığı veya sitenin statik görselleri ulaşsa da JavaScript'in yüklenemediği durumlar otomatik olarak çözülemez; bağlantı sağlık kontrolü tam işlevsellik testi değildir.
+- İlk otomatik geçişten tarayıcının geri tuşuyla dönüldüğünde yeniden zorla yönlendirilmez. Linkteki davet parametreleri (`search`/`hash`) yönlendirilen adrese korunur. Her iki sağlayıcı mevcut Supabase verilerini paylaşır; bu sayfa kimlik bilgisi saklamaz.
+- **Önemli:** GitHub Pages yayını bu repo için GitHub Settings üzerinden etkinleştirilmelidir. Bu kodun GitHub'a commitlenmiş olması tek başına Pages yayını başlatmaz.

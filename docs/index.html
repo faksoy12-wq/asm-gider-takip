@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#116a64">
+  <meta name="referrer" content="no-referrer">
+  <meta name="description" content="ASM Gider Takip için otomatik alternatif bağlantı seçimi">
+  <title>ASM Gider Takip · Akıllı Giriş</title>
+  <style>
+    :root{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#18343d;background:#eef4f3;-webkit-text-size-adjust:100%}
+    *{box-sizing:border-box}
+    body{min-height:100vh;margin:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px 15px}
+    main{width:100%;max-width:480px;background:#fff;border:1px solid #dfebe8;border-radius:23px;box-shadow:0 18px 50px rgba(14,67,66,.07);padding:30px 24px 23px}
+    .brand{display:flex;align-items:center;gap:13px;margin-bottom:21px}
+    .logo{height:47px;width:47px;flex:none;display:grid;place-items:center;border-radius:13px;background:#116a64;color:#fff;font-size:23px;font-weight:800;letter-spacing:-1px}
+    h1{font-size:21px;letter-spacing:-.6px;margin:0 0 3px;color:#153d3a}
+    .sub{font-size:12px;color:#708682}
+    .lead{font-size:14px;line-height:1.7;color:#5d706f;margin:10px 0 20px}
+    .status{background:#edf7f4;border:1px solid #d5e9e2;border-radius:14px;padding:15px;display:flex;gap:12px;align-items:flex-start;margin-bottom:16px}
+    .indicator{flex:none;width:21px;height:21px;border-radius:50%;border:3px solid #c2e2d8;border-top-color:#116a64;animation:spin .9s linear infinite;margin-top:2px}
+    .indicator.done{animation:none;border:none;background:#15866e;color:#fff;font-size:15px;text-align:center;line-height:21px}
+    .indicator.off{animation:none;border:none;background:#e9a64d;color:white;font-size:16px;text-align:center;line-height:21px}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .status strong{font-size:14px;color:#21534d;display:block}
+    .status p{margin:3px 0 0;font-size:12px;color:#5d7770;line-height:1.55}
+    .section-name{font-size:12px;font-weight:700;letter-spacing:.025em;color:#697e7b;margin:24px 0 10px}
+    .dest{display:flex;justify-content:space-between;align-items:center;gap:12px;text-decoration:none;color:#24534d;border:1px solid #dce9e4;border-radius:13px;padding:14px 14px;margin-top:9px;transition:border-color .2s,background .2s}
+    .dest:hover,.dest:focus-visible{border-color:#0e8172;background:#f1faf6}
+    .dest strong{font-size:14px;display:block}
+    .dest small{font-size:12px;display:block;color:#778784;margin-top:3px}
+    .arrow{font-size:22px;color:#148775;flex:none}
+    .tiny{font-size:11px;color:#7c8b89;line-height:1.6;margin-top:17px}
+    .try-again{background:none;border:0;cursor:pointer;padding:3px 0;color:#116a64;font:600 13px inherit;text-decoration:underline;text-underline-offset:3px}
+    footer{text-align:center;color:#8a9e99;font-size:11px;margin-top:18px;line-height:1.5;max-width:420px}
+    @media(max-width:360px){main{padding:22px 17px}body{padding:13px}}
+    @media(prefers-reduced-motion:reduce){.indicator{animation:none}}
+  </style>
+</head>
+<body>
+<main>
+  <div class="brand">
+    <div class="logo" aria-hidden="true">ASM</div>
+    <div>
+      <h1>ASM Gider Takip</h1>
+      <div class="sub">Akıllı bağlantı seçimi</div>
+    </div>
+  </div>
+  <p class="lead">Size en uygun erişim adresi kontrol ediliyor. Uygulama otomatik açılmazsa aşağıdan bir bağlantıyı seçebilirsiniz.</p>
+  <div class="status" role="status" aria-live="polite">
+    <span class="indicator" id="indicator" aria-hidden="true"></span>
+    <div><strong id="headline">Bağlantılar kontrol ediliyor…</strong><p id="details">Vercel ve Cloudflare bağlantıları cihazınızdan ayrı ayrı deneniyor.</p></div>
+  </div>
+  <button class="try-again" type="button" id="retry">Yeniden kontrol et</button>
+  <div class="section-name">ALTERNATİF GİRİŞ ADRESLERİ</div>
+  <a class="dest" id="vercel-link" href="https://asm-gider-takip.vercel.app/">
+    <span><strong>Vercel üzerinden aç</strong><small id="vercel-state">Durum kontrol ediliyor</small></span>
+    <span class="arrow" aria-hidden="true">↗</span>
+  </a>
+  <a class="dest" id="cloudflare-link" href="https://asm-gider-takip.f-aksoy12.workers.dev/">
+    <span><strong>Cloudflare üzerinden aç</strong><small id="cloudflare-state">Durum kontrol ediliyor</small></span>
+    <span class="arrow" aria-hidden="true">↗</span>
+  </a>
+  <p class="tiny">Bu kontrol yalnızca sunucunun küçük bir görsel dosyasına erişimi ölçer; uygulamanın giriş ekranının açılacağını kesin olarak garanti etmez. Beyaz ekran görürseniz geri dönerek diğer adresi seçin.</p>
+</main>
+<footer>İki adres de aynı güvenli ASM veritabanını kullanır.<br>Bu giriş sayfası kullanıcı bilgisi veya gider kaydı saklamaz.</footer>
+<noscript><p>Otomatik seçim için JavaScript gerekir. Yukarıdaki iki bağlantıyı doğrudan kullanabilirsiniz.</p></noscript>
+<script>
+(function(){
+  'use strict';
+  var endpoints={
+    vercel:'https://asm-gider-takip.vercel.app/',
+    cloudflare:'https://asm-gider-takip.f-aksoy12.workers.dev/'
+  };
+  var state={vercel:null,cloudflare:null}, chosen=false, attempt=0, fallbackTimer=null;
+  var icon=document.getElementById('indicator'), headline=document.getElementById('headline'), details=document.getElementById('details');
+  var buttons={vercel:document.getElementById('vercel-link'),cloudflare:document.getElementById('cloudflare-link')};
+  var label={vercel:document.getElementById('vercel-state'),cloudflare:document.getElementById('cloudflare-state')};
+  function target(key){return endpoints[key]+location.search+location.hash;}
+  Object.keys(buttons).forEach(function(key){
+    buttons[key].href=target(key);
+    buttons[key].addEventListener('click',function(){chosen=true;clearTimeout(fallbackTimer);});
+  });
+  function message(title,body,kind){
+    headline.textContent=title;details.textContent=body;
+    icon.className='indicator'+(kind?' '+kind:'');
+    icon.textContent=kind==='done'?'✓':kind==='off'?'!':'';
+  }
+  function navigate(key){
+    if(chosen)return;
+    chosen=true;
+    clearTimeout(fallbackTimer);
+    message('Bağlantı bulundu, uygulama açılıyor…',
+      (key==='vercel'?'Vercel':'Cloudflare')+' üzerinden devam ediliyor.','done');
+    try{history.replaceState({asmRedirectAttempted:true},'',location.href);}catch(e){}
+    // Preserve ASM invitation tokens from the launcher URL. Use assign instead
+    // of replace so users can return and manually select the other provider.
+    setTimeout(function(){location.assign(target(key));},450);
+  }
+  function update(key,ok,token){
+    if(token!==attempt)return;
+    state[key]=ok;
+    label[key].textContent=ok?'Erişilebilir': 'Bu cihazdan yanıt alınamadı';
+    label[key].style.color=ok?'#147761':'#a15f46';
+    if(chosen)return;
+    if(key==='vercel'&&ok){navigate('vercel');return;}
+    if(key==='cloudflare'&&ok){
+      if(state.vercel===false){navigate('cloudflare');return;}
+      clearTimeout(fallbackTimer);
+      fallbackTimer=setTimeout(function(){
+        if(!chosen&&state.vercel!==true)navigate('cloudflare');
+      },1500);
+    }
+    if(state.vercel===false&&state.cloudflare===true){navigate('cloudflare');return;}
+    if(state.vercel===false&&state.cloudflare===false){
+      message('Otomatik bağlantı kurulamadı',
+        'İki adres de bu cihazdan yanıt vermedi. Manuel bağlantıları deneyebilir veya farklı bir ağa geçebilirsiniz.','off');
+    }
+  }
+  function probe(key,token){
+    var image=new Image(), finished=false, timer=null;
+    function end(ok){
+      if(finished)return;
+      finished=true;clearTimeout(timer);
+      image.onload=null;image.onerror=null;
+      update(key,ok,token);
+    }
+    image.onload=function(){end(true);};
+    image.onerror=function(){end(false);};
+    timer=setTimeout(function(){end(false);},7000);
+    // Image loading doesn't require CORS, and a unique URL avoids a false
+    // positive from the browser's HTTP cache.
+    image.src=endpoints[key]+'favicon-32.png?asm_probe='+Date.now()+'_'+token;
+  }
+  function start(){
+    chosen=false;clearTimeout(fallbackTimer);
+    var token=++attempt;
+    state.vercel=null;state.cloudflare=null;
+    label.vercel.textContent='Kontrol ediliyor…';
+    label.cloudflare.textContent='Kontrol ediliyor…';
+    label.vercel.style.color='';label.cloudflare.style.color='';
+    message('Bağlantılar kontrol ediliyor…','Vercel ve Cloudflare bağlantıları deneniyor.','');
+    probe('vercel',token);probe('cloudflare',token);
+  }
+  document.getElementById('retry').addEventListener('click',start);
+  // When the user returns after a failed page navigation, never auto-redirect
+  // them into the same inaccessible site again.
+  if(history.state&&history.state.asmRedirectAttempted){
+    chosen=true;
+    message('Diğer adresi deneyebilirsiniz',
+      'Önceki giriş adresi açılmadıysa aşağıdan alternatif bağlantıyı seçin.','off');
+  }else start();
+  window.addEventListener('pageshow',function(event){
+    if(event.persisted&&history.state&&history.state.asmRedirectAttempted){
+      chosen=true;clearTimeout(fallbackTimer);
+      message('Diğer adresi deneyebilirsiniz',
+        'Uygulama açılmadıysa alternatif bağlantıyı manuel seçin.','off');
+    }
+  });
+})();
+</script>
+</body>
+</html>
