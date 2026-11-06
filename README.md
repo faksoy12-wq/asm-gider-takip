@@ -184,3 +184,10 @@ Cloudflare'ın yeni kurulum akışı otomatik olarak **Workers Builds** açtı; 
 - Tarayıcının adresi hiç açamadığı veya sitenin statik görselleri ulaşsa da JavaScript'in yüklenemediği durumlar otomatik olarak çözülemez; bağlantı sağlık kontrolü tam işlevsellik testi değildir.
 - İlk otomatik geçişten tarayıcının geri tuşuyla dönüldüğünde yeniden zorla yönlendirilmez. Linkteki davet parametreleri (`search`/`hash`) yönlendirilen adrese korunur. Her iki sağlayıcı mevcut Supabase verilerini paylaşır; bu sayfa kimlik bilgisi saklamaz.
 - **Önemli:** GitHub Pages yayını bu repo için GitHub Settings üzerinden etkinleştirilmelidir. Bu kodun GitHub'a commitlenmiş olması tek başına Pages yayını başlatmaz.
+
+## v24 — Render üçüncü statik yedek ve akıllı giriş güncellemesi
+
+- Render static site: `https://asm-gider-takip-yedek.onrender.com/`, workspace `My Workspace`, GitHub `main` branch, build command `node scripts/build-static.js`, publish `dist`, auto-deploy enabled. Render deploy initial status `live`.
+- `docs/index.html` GitHub Pages akıllı giriş sayfasında üçüncü probe hedefi olarak Render eklendi. Öncelik Vercel → Cloudflare → Render; 7 saniyelik bağımsız görsel istekleri tamamlandığında ilk erişilebilir adres açılır.
+- Manuel üç bağlantı ve davet parametrelerinin (`search` ve `hash`) korunması devam eder. GitHub Pages yayınının tamamlanması ve farklı ağlardan gerçek cihaz testi gerekir.
+- Erişilebilir favicon, uygulamanın veya Supabase'in tamamen çalıştığını garanti etmez. Tarayıcı tüm sağlayıcıların DNS/TLS isteğini engelliyorsa otomatik yönlendirme bunu aşamaz.
