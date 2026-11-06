@@ -155,3 +155,16 @@ Vercel üzerinden erişim sağlayamayan iş yeri ağları için **aynı Supabase
 - Cloudflare'da Pages adresi oluşturulduktan sonra Supabase → Authentication → URL Configuration → **Redirect URLs** listesine tam adres (ör. `https://<proje>.pages.dev/`) eklenmelidir; aksi takdirde yeni hesapların e-posta onay bağlantısı varsayılan Vercel adresine dönebilir. Üretimde exact URL tercih edilir.
 - Giriş, ASM davet linkleri ve PDF çıktı işlemleri, her statik ayna kendi origin adresinde çalışır. Mevcut kullanıcıların ilk kez alternatif domaine geçtiklerinde **tekrar giriş yapmaları normaldir**, çünkü tarayıcı oturumları origin bazında tutulur.
 - Bir ağ `supabase.co` veya `cdn.jsdelivr.net` erişimini de engelliyorsa ikinci adres tek başına yeterli olmayabilir; bağlantıyı gerçek iş yeri Wi-Fi'sinden doğrulayın.
+
+## v21 — Cloudflare Workers statik dağıtımı (kullanıcının mevcut kurulumu)
+
+Cloudflare'ın yeni kurulum akışı otomatik olarak **Workers Builds** açtı; ekrandaki deploy komutu `npx wrangler deploy`. Pages'i yeniden oluşturmak gerekmiyor. `wrangler.jsonc` bu mevcut Worker'ın `dist/` klasöründeki uygulama varlıklarını **statik dosya olarak** sunmasını sağlar. Hazır GitHub build entegrasyonu:
+
+- Build command: `node scripts/build-static.js`
+- Deploy command: `npx wrangler deploy`
+- Worker name: `asm-gider-takip`
+- `wrangler.jsonc` assets directory: `./dist`
+- Statik Worker adresleri genelde `*.workers.dev` uzantılıdır. `cloud.js` bu alan adlarında `public-config.json` dosyasını okur. Vercel mevcut API üzerinden çalışmayı sürdürür.
+- Cloudflare Workers → Domains & Routes altında gerçekten yayımlanan **tam** `workers.dev` URL bulunmalı. Adresi varsaymayın.
+- Supabase Authentication Redirect URLs listesine mevcut Worker URL'si eklenmelidir. Aynı Supabase hesabıyla tekrar giriş gerekir; browser login state farklı origin'ler arasında paylaşılmaz.
+- Yayımlanan alternatif adresin iş yerindeki Wi-Fi ve farklı mobil ağlarda açılacağı garanti edilemez; gerçek ağlarda test edin.

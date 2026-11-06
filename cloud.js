@@ -33,9 +33,9 @@ window.ASMCloud = (() => {
     listener=onChange;
     try {
       // Vercel serves this configuration from a serverless API.
-      // Cloudflare Pages and other static mirrors use an identical public JSON
-      // file in their own origin; no secret/server key is needed or embedded.
-      const staticMirror=/(?:^|\.)(?:pages\.dev|onrender\.com|netlify\.app)$/.test(location.hostname||'');
+      // Cloudflare Workers/Pages and other static mirrors use an identical
+      // public JSON file hosted on their own origin. No secret key is embedded.
+      const staticMirror=/(?:^|\.)(?:workers\.dev|pages\.dev|onrender\.com|netlify\.app)$/.test(location.hostname||'');
       const configPath=staticMirror?'./public-config.json':'/api/public-config';
       const response=await fetch(configPath,{cache:'no-store'});
       if(!response.ok)throw new Error('Bağlantı kurulamadı. İnternet bağlantınızı kontrol ederek yeniden deneyin.');
