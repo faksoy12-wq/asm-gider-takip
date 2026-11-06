@@ -32,7 +32,12 @@ window.ASMCloud = (() => {
   async function init(onChange) {
     listener=onChange;
     try {
-      const response=await fetch('/api/public-config',{cache:'no-store'});
+      // Vercel serves this configuration from a serverless API.
+      // Cloudflare Pages and other static mirrors use an identical public JSON
+      // file in their own origin; no secret/server key is needed or embedded.
+      const staticMirror=/(?:^|\.)(?:pages\.dev|onrender\.com|netlify\.app)$/.test(location.hostname||'');
+      const configPath=staticMirror?'./public-config.json':'/api/public-config';
+      const response=await fetch(configPath,{cache:'no-store'});
       if(!response.ok)throw new Error('Bağlantı kurulamadı. İnternet bağlantınızı kontrol ederek yeniden deneyin.');
       const config=await response.json();
       if(!config.enabled)return;
@@ -178,7 +183,8 @@ window.ASMCloud = (() => {
   }
   async function register(email,password) {
     if(!client)throw new Error('Bulut hizmeti henüz yapılandırılmadı');
-    const {data,error}=await client.auth.signUp({email,password,options:{emailRedirectTo:location.origin}});
+    const redirectTo=new URL('./',location.href).href;
+    const {data,error}=await client.auth.signUp({email,password,options:{emailRedirectTo:redirectTo}});
     if(error)throw error;
     if(data.session){setUser(data.user);await loadWorkspace();}
     return Boolean(data.session);

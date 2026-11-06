@@ -143,3 +143,15 @@ Hekimler ekranı yalnızca hekim kayıtlarını gösterir. İsteğe bağlı JSON
 - Giriş/ilk kayıt/ASM davetini kabul etme anında buluttan gelen kayıtlar otomatik ekrana yansır. Önceki `busy` denetimi giriş işlemlerini yanlışlıkla finansal kayıt yazma işlemi gibi değerlendirerek veriyi göstermiyordu. Yeni `ledgerWriteInProgress` yalnızca gerçek finansal kayıt yazımını korur.
 - ASM'ye henüz bağlı olmayan ve oturumu açık hesaplarda sayfaya/uygulamaya dönüşte ve uygulama açıkken 30 saniyede bir üyelik kontrol edilir. Yönetici doğrudan erişim verdiğinde yeni ASM ve kayıtları ekstra butona basmadan açılır.
 - Düğme isteğe bağlı kalır. Açık düzenleme formları otomatik yenileme tarafından kesilmez. Bulut ve SQL şemaları değiştirilmedi.
+
+## v20 — Cloudflare Pages ücretsiz alternatif yayın
+
+Vercel üzerinden erişim sağlayamayan iş yeri ağları için **aynı Supabase veritabanını** kullanan Cloudflare Pages statik kopyası hazırlanmıştır.
+
+- Mevcut Vercel projesi aynı kalır, `/api/public-config` sunucusundan genel ayarlarını okumaya devam eder.
+- `*.pages.dev` üzerinde `cloud.js`, yalnızca **publishable (public)** Supabase URL ve anahtarını içeren `./public-config.json` dosyasını okur. Service-role anahtarları veya kullanıcı verileri hiçbir zaman statik kopyaya konulmaz.
+- `node scripts/build-static.js` komutu tarayıcıda kullanılacak dosyaları `dist/` dizinine ayıklar; Vercel `api/`, Supabase migration dosyaları ve kod deposunun yardımcı dosyaları yayınlanmaz.
+- Cloudflare dashboard → Workers & Pages → Create → Pages → **Import Git repository** → `faksoy12-wq/asm-gider-takip` → production branch `main` → build command `node scripts/build-static.js` → output directory `dist`.
+- Cloudflare'da Pages adresi oluşturulduktan sonra Supabase → Authentication → URL Configuration → **Redirect URLs** listesine tam adres (ör. `https://<proje>.pages.dev/`) eklenmelidir; aksi takdirde yeni hesapların e-posta onay bağlantısı varsayılan Vercel adresine dönebilir. Üretimde exact URL tercih edilir.
+- Giriş, ASM davet linkleri ve PDF çıktı işlemleri, her statik ayna kendi origin adresinde çalışır. Mevcut kullanıcıların ilk kez alternatif domaine geçtiklerinde **tekrar giriş yapmaları normaldir**, çünkü tarayıcı oturumları origin bazında tutulur.
+- Bir ağ `supabase.co` veya `cdn.jsdelivr.net` erişimini de engelliyorsa ikinci adres tek başına yeterli olmayabilir; bağlantıyı gerçek iş yeri Wi-Fi'sinden doğrulayın.
